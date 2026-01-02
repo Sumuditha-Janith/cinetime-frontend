@@ -7,6 +7,8 @@ const Register = lazy(() => import("../pages/Register"));
 const VerifyOTP = lazy(() => import("../pages/VerifyOTP"));
 const Login = lazy(() => import("../pages/Login"));
 const Dashboard = lazy(() => import("../pages/Dashboard"));
+const ForgotPassword = lazy(() => import("../pages/ForgotPassword"));
+const ResetPassword = lazy(() => import("../pages/ResetPassword"));
 
 // Layout component for authenticated pages
 const AuthenticatedLayout = lazy(() => import("../components/AuthenticatedLayout"));
@@ -27,7 +29,8 @@ export default function Router() {
           <Route path="/register" element={<Register />} />
           <Route path="/verify-otp" element={<VerifyOTP />} />
           <Route path="/login" element={<Login />} />
-          
+          <Route path="/forgot-password" element={<ForgotPassword />} />
+          <Route path="/reset-password/:token" element={<ResetPassword />} />
           {/* Protected Routes with Layout */}
           <Route
             path="/dashboard"
