@@ -44,6 +44,14 @@ export default function Navbar() {
     return "U";
   };
 
+  const formatRole = (role: string): string => {
+    switch(role) {
+      case "ADMIN": return "👑 Admin";
+      case "AUTHOR": return "✍️ Author";
+      default: return "🎬 User";
+    }
+  };
+
   return (
     <nav className="bg-slate-800 border-b border-slate-700 sticky top-0 z-40">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -153,13 +161,7 @@ export default function Navbar() {
                       {user.firstname} {user.lastname}
                     </span>
                     <span className="text-xs text-slate-400">
-                      {user.roles?.map(role => {
-                        switch(role) {
-                          case "ADMIN": return "👑 Admin";
-                          case "AUTHOR": return "✍️ Author";
-                          default: return "🎬 User";
-                        }
-                      }).join(", ")}
+                      {user.roles?.map((role: string) => formatRole(role)).join(", ")}
                     </span>
                   </div>
                   
@@ -357,7 +359,6 @@ export default function Navbar() {
                 </div>
               </>
             ) : (
-
               <>
                 <Link
                   to="/"

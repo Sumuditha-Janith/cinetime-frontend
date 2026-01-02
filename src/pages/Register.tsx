@@ -12,12 +12,13 @@ export default function Register() {
     password: "",
     confirmPassword: "",
   });
-  const [role, setRole] = useState("USER");
+  // Comment out role selection for now - only USER registration allowed
+  // const [role, setRole] = useState("USER");
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [message, setMessage] = useState("");
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
     setFormData(prev => ({ ...prev, [name]: value }));
     
@@ -82,12 +83,13 @@ export default function Register() {
 
     setLoading(true);
     try {
+      // Only allow USER registration for now
       const res = await register({ 
         firstname: formData.firstname, 
         lastname: formData.lastname, 
         email: formData.email, 
         password: formData.password, 
-        role 
+        role: "USER" // Hardcoded to USER only
       });
       
       setMessage(res.message);
@@ -217,7 +219,8 @@ export default function Register() {
             )}
           </div>
 
-          {/* Account Type */}
+          {/* NOTE: Role selection removed - only USER registration allowed */}
+          {/* 
           <div>
             <label className="block text-sm font-medium mb-1 text-slate-300">Account Type</label>
             <select
@@ -233,6 +236,20 @@ export default function Register() {
                 ? "Authors can create content and need admin approval" 
                 : "Users can track movies and manage watchlists"}
             </p>
+          </div>
+          */}
+
+          {/* Account Type Info (Read-only) */}
+          <div className="p-3 bg-slate-900/50 rounded-lg border border-slate-700">
+            <div className="flex items-center">
+              <span className="text-rose-400 mr-3">🎬</span>
+              <div>
+                <p className="text-sm font-medium text-slate-50">Movie Enthusiast Account</p>
+                <p className="text-xs text-slate-400">
+                  Track movies, manage watchlists, and discover new content
+                </p>
+              </div>
+            </div>
           </div>
 
           {/* Submit Button */}

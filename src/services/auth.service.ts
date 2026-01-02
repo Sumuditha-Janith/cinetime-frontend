@@ -5,7 +5,8 @@ type RegisterDataType = {
   lastname: string;
   email: string;
   password: string;
-  role: string;
+  // Make role optional since we're hardcoding it to "USER"
+  role?: string;
 };
 
 export const validateEmail = (email: string): boolean => {
@@ -31,7 +32,12 @@ export const validateName = (name: string): boolean => {
 };
 
 export const register = async (data: RegisterDataType) => {
-  const res = await api.post("/auth/register", data);
+  // Add default role if not provided
+  const payload = {
+    ...data,
+    role: data.role || "USER" // Default to USER
+  };
+  const res = await api.post("/auth/register", payload);
   return res.data;
 };
 
