@@ -40,38 +40,46 @@ export default function Login() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-900 to-black text-white flex flex-col justify-center items-center p-4">
-      <div className="w-full max-w-md bg-gray-800 rounded-2xl shadow-2xl p-8">
+    <div className="min-h-screen bg-slate-900 text-slate-50 flex flex-col justify-center items-center p-4">
+      <div className="w-full max-w-md bg-slate-800 rounded-2xl shadow-2xl border border-slate-700 p-8 animate-slide-up">
+        {/* Header */}
         <div className="text-center mb-8">
-          <h1 className="text-3xl font-bold mb-2">🎬 Welcome Back</h1>
-          <p className="text-gray-400">Sign in to your CINETIME account</p>
+          <div className="inline-block p-3 rounded-2xl bg-rose-600 mb-4">
+            <span className="text-3xl">🎬</span>
+          </div>
+          <h1 className="text-3xl font-bold mb-2 text-slate-50">Welcome Back</h1>
+          <p className="text-slate-400">Sign in to your CINETIME account</p>
         </div>
 
+        {/* Message Display */}
         {message && (
-          <div className={`p-3 rounded-lg mb-4 ${message.includes("success") ? "bg-green-900" : "bg-red-900"}`}>
+          <div className={`p-3 rounded-lg mb-4 ${message.includes("success") 
+            ? "bg-green-900/30 border border-green-500/30 text-green-300" 
+            : "bg-rose-900/30 border border-rose-500/30 text-rose-300"}`}>
             {message}
           </div>
         )}
 
+        {/* Login Form */}
         <form onSubmit={handleLogin} className="space-y-6">
           <div>
-            <label className="block text-sm font-medium mb-2">Email</label>
+            <label className="block text-sm font-medium mb-2 text-slate-300">Email</label>
             <input
               type="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              className="w-full p-3 bg-gray-700 border border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500"
+              className="w-full p-3 bg-slate-700 border border-slate-600 rounded-lg focus:ring-2 focus:ring-rose-500 focus:border-transparent text-slate-50"
               placeholder="john@example.com"
             />
           </div>
 
           <div>
-            <label className="block text-sm font-medium mb-2">Password</label>
+            <label className="block text-sm font-medium mb-2 text-slate-300">Password</label>
             <input
               type="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              className="w-full p-3 bg-gray-700 border border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500"
+              className="w-full p-3 bg-slate-700 border border-slate-600 rounded-lg focus:ring-2 focus:ring-rose-500 focus:border-transparent text-slate-50"
               placeholder="••••••••"
             />
           </div>
@@ -79,22 +87,28 @@ export default function Login() {
           <button
             type="submit"
             disabled={loading}
-            className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-4 rounded-lg transition duration-200 disabled:opacity-50"
+            className="w-full bg-rose-600 hover:bg-rose-700 text-slate-50 font-bold py-3 px-4 rounded-lg transition duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            {loading ? "Signing in..." : "Sign In"}
+            {loading ? (
+              <span className="flex items-center justify-center">
+                <div className="w-5 h-5 border-2 border-slate-50 border-t-transparent rounded-full animate-spin mr-2"></div>
+                Signing in...
+              </span>
+            ) : "Sign In"}
           </button>
         </form>
 
-        <div className="mt-6 text-center text-gray-400">
-          <p>
+        {/* Footer Links */}
+        <div className="mt-6 text-center text-slate-400">
+          <p className="mb-2">
             Don't have an account?{" "}
-            <Link to="/register" className="text-blue-400 hover:underline">
+            <Link to="/register" className="text-rose-400 hover:text-rose-300 hover:underline">
               Register here
             </Link>
           </p>
-          <p className="mt-2">
+          <p>
             Forgot password?{" "}
-            <Link to="/forgot-password" className="text-blue-400 hover:underline">
+            <Link to="/forgot-password" className="text-rose-400 hover:text-rose-300 hover:underline">
               Reset it
             </Link>
           </p>

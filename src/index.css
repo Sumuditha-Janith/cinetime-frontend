@@ -1,3 +1,41 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+/* Custom utility classes */
+@layer components {
+  .btn-crimson {
+    @apply bg-rose-600 hover:bg-rose-700 text-slate-50 font-bold py-3 px-6 rounded-lg transition duration-200 transform hover:scale-105;
+  }
+  
+  .btn-secondary {
+    @apply bg-slate-800 hover:bg-slate-700 text-slate-50 font-bold py-3 px-6 rounded-lg transition duration-200 border border-slate-700;
+  }
+  
+  .input-crimson {
+    @apply w-full p-3 bg-slate-700 border border-slate-600 rounded-lg focus:ring-2 focus:ring-rose-500 focus:border-transparent text-slate-50;
+  }
+  
+  .card-crimson {
+    @apply bg-slate-800 rounded-2xl border border-slate-700 p-6;
+  }
+  
+  .text-title {
+    @apply text-slate-50 font-bold;
+  }
+  
+  .text-subtitle {
+    @apply text-slate-400;
+  }
+  
+  .text-detail {
+    @apply text-slate-500;
+  }
+}
+
+/* Custom animations */
+@layer utilities {
+  .animation-delay-2000 {
+    animation-delay: 2s;
+  }
+}
