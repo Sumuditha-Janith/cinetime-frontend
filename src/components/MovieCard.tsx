@@ -93,21 +93,24 @@ export default function MovieCard({
     }
   };
 
-  const handleStatusChange = async (newStatus: "planned" | "watching" | "completed") => {
-    if (!watchlistId) return;
+const handleStatusChange = async (newStatus: "planned" | "watching" | "completed") => {
+  if (!watchlistId) return;
 
-    setLoading(true);
-    try {
-      await updateWatchStatus(watchlistId, { watchStatus: newStatus });
-      setCurrentStatus(newStatus);
-      if (onStatusChange) onStatusChange();
-    } catch (error: any) {
-      console.error("Failed to update status:", error);
-      alert(error.response?.data?.message || "Failed to update status");
-    } finally {
-      setLoading(false);
+  setLoading(true);
+  try {
+    await updateWatchStatus(watchlistId, { watchStatus: newStatus });
+    setCurrentStatus(newStatus);
+    
+    if (onStatusChange) {
+      onStatusChange();
     }
-  };
+  } catch (error: any) {
+    console.error("Failed to update status:", error);
+    alert(error.response?.data?.message || "Failed to update status");
+  } finally {
+    setLoading(false);
+  }
+};
 
   const getStatusColor = (status: string) => {
     switch (status) {
