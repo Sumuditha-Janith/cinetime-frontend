@@ -1,8 +1,10 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
 import { getWatchlist, getWatchlistStats, updateWatchStatus, removeFromWatchlist } from "../services/media.service";
 import MovieCard from "../components/MovieCard";
 import Navbar from "../components/Navbar";
 import { useAuth } from "../context/authContext";
+import { debug } from "../utils/debug";
+import api from "../services/api";
 
 interface WatchlistItem {
   _id: string;
@@ -63,159 +65,261 @@ export default function Watchlist() {
   const [refreshingStats, setRefreshingStats] = useState(false);
   const [activeFilter, setActiveFilter] = useState<string>("all");
   const [lastUpdated, setLastUpdated] = useState<Date>(new Date());
+  const [debugInfo, setDebugInfo] = useState<string[]>([]);
+
+  const addDebugInfo = (info: string) => {
+    setDebugInfo(prev => [...prev.slice(-9), `${new Date().toLocaleTimeString()}: ${info}`]);
+  };
 
   useEffect(() => {
     if (user) {
+      debug.log('Watchlist', 'Component mounted or user changed', { user: user.email });
+      addDebugInfo(`User logged in: ${user.email}`);
       fetchWatchlist();
       fetchStats();
     }
   }, [user, activeFilter]);
 
-  // Auto-refresh stats every 10 seconds
-  useEffect(() => {
-    if (!user) return;
-
-    const interval = setInterval(() => {
-      console.log("⏰ Auto-refreshing stats...");
-      forceRefreshStats();
-    }, 10000);
-
-    return () => clearInterval(interval);
-  }, [user]);
-
-  const fetchTMDBDetails = async (tmdbId: number, type: "movie" | "tv"): Promise<any> => {
-    try {
-      const apiKey = import.meta.env.VITE_TMDB_API_KEY;
-      if (!apiKey) {
-        console.error("TMDB API key is missing");
-        return null;
-      }
-
-      const response = await fetch(
-        `https://api.themoviedb.org/3/${type}/${tmdbId}?api_key=${apiKey}&language=en-US`
-      );
-      
-      if (!response.ok) {
-        throw new Error(`TMDB API error: ${response.status}`);
-      }
-      
-      return await response.json();
-    } catch (error) {
-      console.error(`Failed to fetch TMDB details for ${type} ID ${tmdbId}:`, error);
-      return null;
-    }
-  };
-
   const fetchWatchlist = async () => {
     try {
-      console.log("📋 Fetching watchlist...");
+      addDebugInfo('Fetching watchlist...');
+      debug.log('Watchlist', 'fetchWatchlist called', { activeFilter });
       const status = activeFilter === "all" ? undefined : activeFilter;
       const response = await getWatchlist(1, status);
-      console.log("✅ Watchlist response:", response.data.length, "items");
       
-      const enrichedItems = await Promise.all(
-        response.data.map(async (item: WatchlistItem) => {
-          try {
-            const tmdbData = await fetchTMDBDetails(item.tmdbId, item.type);
-            
-            if (tmdbData) {
-              return {
-                ...item,
-                vote_average: tmdbData.vote_average || 0,
-                vote_count: tmdbData.vote_count || 0,
-                overview: tmdbData.overview || "No description available",
-                backdrop_path: tmdbData.backdrop_path || "",
-              };
-            }
-          } catch (error) {
-            console.error(`Error fetching TMDB data for ${item.title}:`, error);
-          }
-          
-          return {
-            ...item,
-            vote_average: 0,
-            vote_count: 0,
-            overview: "No description available",
-            backdrop_path: "",
-          };
-        })
-      );
+      debug.log('Watchlist', 'Watchlist API response', { 
+        items: response.data.length,
+        data: response.data
+      });
+      addDebugInfo(`Got ${response.data.length} watchlist items`);
       
-      setWatchlist(enrichedItems);
-    } catch (error) {
-      console.error("❌ Failed to fetch watchlist:", error);
+      // Calculate local stats from watchlist
+      calculateLocalStats(response.data);
+      
+      setWatchlist(response.data);
+    } catch (error: any) {
+      debug.error('Watchlist', 'Failed to fetch watchlist', error);
+      addDebugInfo(`Error fetching watchlist: ${error.message}`);
       setWatchlist([]);
     } finally {
       setLoading(false);
     }
   };
 
+  const calculateLocalStats = (items: WatchlistItem[]) => {
+    if (!items.length) {
+      setStats(null);
+      return;
+    }
+
+    const totalItems = items.length;
+    
+    // Calculate completed items
+    const completedItems = items.filter(item => item.watchStatus === "completed");
+    const completedCount = completedItems.length;
+    
+    // Calculate planned items
+    const plannedItems = items.filter(item => item.watchStatus === "planned");
+    const plannedCount = plannedItems.length;
+    
+    // Calculate watching items
+    const watchingItems = items.filter(item => item.watchStatus === "watching");
+    const watchingCount = watchingItems.length;
+    
+    // Calculate watch times
+    const totalWatchTime = completedItems.reduce((sum, item) => sum + (item.watchTimeMinutes || 0), 0);
+    
+    // Calculate movie stats
+    const movies = items.filter(item => item.type === "movie");
+    const completedMovies = movies.filter(item => item.watchStatus === "completed");
+    const movieWatchTime = completedMovies.reduce((sum, item) => sum + (item.watchTimeMinutes || 0), 0);
+    
+    // Calculate TV stats
+    const tvShows = items.filter(item => item.type === "tv");
+    const completedTV = tvShows.filter(item => item.watchStatus === "completed");
+    const tvWatchTime = completedTV.reduce((sum, item) => sum + (item.watchTimeMinutes || 0), 0);
+    
+    // Format times
+    const formatTime = (minutes: number): string => {
+      const hours = Math.floor(minutes / 60);
+      const mins = minutes % 60;
+      return `${hours}h ${mins}m`;
+    };
+    
+    // Build byStatus array
+    const byStatus = [
+      { status: "planned", count: plannedCount, time: 0 },
+      { status: "watching", count: watchingCount, time: 0 },
+      { status: "completed", count: completedCount, time: totalWatchTime }
+    ].filter(s => s.count > 0);
+    
+    // Build byType array
+    const byType = [
+      { type: "movie", count: movies.length },
+      { type: "tv", count: tvShows.length }
+    ];
+    
+    const localStats = {
+      totalItems,
+      totalWatchTime,
+      totalWatchTimeFormatted: formatTime(totalWatchTime),
+      
+      movieStats: {
+        total: movies.length,
+        completed: completedMovies.length,
+        watchTime: movieWatchTime,
+        watchTimeFormatted: formatTime(movieWatchTime)
+      },
+      
+      tvStats: {
+        total: tvShows.length,
+        completed: completedTV.length,
+        watchTime: tvWatchTime,
+        watchTimeFormatted: formatTime(tvWatchTime)
+      },
+      
+      byStatus,
+      byType,
+      
+      plannedCount,
+      watchingCount,
+      completedCount,
+    };
+    
+    console.log("📊 Calculated local stats:", localStats);
+    setStats(localStats);
+  };
+
   const fetchStats = async () => {
     try {
-      console.log("📊 Fetching stats...");
+      addDebugInfo('Fetching stats from API...');
+      debug.log('Watchlist', 'fetchStats called');
       const response = await getWatchlistStats();
-      console.log("✅ Stats response:", response.data);
+      
+      debug.log('Watchlist', 'Stats API response', response.data);
+      addDebugInfo(`API Stats: ${response.data.totalItems} items, ${response.data.completedCount} completed`);
+      
       setStats(response.data);
       setLastUpdated(new Date());
     } catch (error: any) {
-      console.error("❌ Failed to fetch stats:", error);
+      debug.error('Watchlist', 'Failed to fetch stats', error);
+      addDebugInfo(`Error fetching stats: ${error.message}`);
       console.error("Error details:", error.response?.data);
+      
+      // Fall back to local calculation if API fails
+      if (watchlist.length > 0) {
+        addDebugInfo('Using local stats calculation');
+        calculateLocalStats(watchlist);
+      }
     }
   };
 
   const forceRefreshStats = async () => {
-    console.log("🔄 Force refreshing stats...");
+    addDebugInfo('Manual refresh triggered');
+    debug.log('Watchlist', 'forceRefreshStats called');
     setRefreshingStats(true);
     try {
       await Promise.all([fetchStats(), fetchWatchlist()]);
-      console.log("✅ Stats and watchlist refreshed");
+      addDebugInfo('Refresh completed successfully');
+      debug.log('Watchlist', 'Refresh completed');
     } catch (error) {
-      console.error("❌ Failed to refresh stats:", error);
+      debug.error('Watchlist', 'Failed to refresh', error);
+      addDebugInfo('Refresh failed');
     } finally {
       setRefreshingStats(false);
     }
   };
 
-  // Handler for status updates from MovieCard
+  const testStatsEndpoint = async () => {
+    try {
+      addDebugInfo('Testing direct database query...');
+      const response = await api.get('/media/watchlist/debug');
+      console.log('🔍 Debug endpoint response:', response.data);
+      
+      const { totalItems, completedItems, completedWatchTime, items } = response.data.data;
+      addDebugInfo(`DB Query: ${completedItems}/${totalItems} completed items`);
+      
+      // Log each item
+      console.log('📋 Database items:');
+      items.forEach((item: any) => {
+        console.log(`  - ${item.title}: ${item.status} (${item.time} mins)`);
+      });
+      
+      // Update stats based on database
+      if (items.length > 0) {
+        calculateLocalStats(watchlist); // Recalculate from current watchlist
+        addDebugInfo('Updated stats from database');
+      }
+      
+    } catch (error) {
+      console.error('Test stats error:', error);
+      addDebugInfo('Database query failed');
+    }
+  };
+
   const handleStatusUpdate = async (mediaId: string, newStatus: "planned" | "watching" | "completed") => {
-    console.log("🎬 Status update requested for:", mediaId, "->", newStatus);
+    debug.log('Watchlist', 'handleStatusUpdate called', { mediaId, newStatus });
+    addDebugInfo(`Updating status for ${mediaId} to ${newStatus}`);
     
+    // Find the item being updated
+    const itemToUpdate = watchlist.find(item => item._id === mediaId);
+    if (!itemToUpdate) {
+      debug.error('Watchlist', 'Item not found in watchlist', { mediaId });
+      addDebugInfo(`Item ${mediaId} not found in watchlist`);
+      return;
+    }
+    
+    console.log('🔄 Status update details:', {
+      title: itemToUpdate.title,
+      currentStatus: itemToUpdate.watchStatus,
+      newStatus,
+      watchTime: itemToUpdate.watchTimeMinutes
+    });
+
     // Optimistic update: Update local state immediately
-    setWatchlist(prev => 
-      prev.map(item => 
-        item._id === mediaId 
-          ? { ...item, watchStatus: newStatus }
-          : item
-      )
+    const updatedWatchlist = watchlist.map(item => 
+      item._id === mediaId 
+        ? { ...item, watchStatus: newStatus }
+        : item
     );
     
+    // Update local stats immediately
+    calculateLocalStats(updatedWatchlist);
+    setWatchlist(updatedWatchlist);
+    
     try {
+      // Call the API to update status
+      debug.log('Watchlist', 'Calling updateWatchStatus API');
+      
       const response = await updateWatchStatus(mediaId, { watchStatus: newStatus });
-      console.log("✅ Status update successful:", response);
+      console.log('✅ API Response:', response);
+      addDebugInfo(`API: Status updated to ${newStatus} for "${itemToUpdate.title}"`);
       
-      // Refresh stats from server to get accurate calculations
-      await fetchStats();
+      // Refresh from server to ensure consistency
+      setTimeout(async () => {
+        await fetchWatchlist(); // This will recalculate stats
+        addDebugInfo('Data refreshed from server');
+      }, 500);
+      
     } catch (error: any) {
-      console.error("❌ Status update failed:", error);
+      debug.error('Watchlist', 'Status update failed', error);
+      console.error('❌ API Error:', error.response?.data || error.message);
+      addDebugInfo(`Update failed: ${error.response?.data?.message || error.message}`);
       
-      // Revert optimistic update on error
-      setWatchlist(prev => 
-        prev.map(item => 
-          item._id === mediaId 
-            ? { ...item, watchStatus: item.watchStatus } // Revert
-            : item
-        )
-      );
+      // Revert on error
+      await fetchWatchlist();
     }
   };
 
   const handleRemove = async (mediaId: string) => {
-    console.log("🗑️ Removing item:", mediaId);
+    debug.log('Watchlist', 'handleRemove called', { mediaId });
+    addDebugInfo(`Removing item ${mediaId}`);
     try {
       await removeFromWatchlist(mediaId);
       await forceRefreshStats();
     } catch (error) {
-      console.error("Failed to remove:", error);
+      debug.error('Watchlist', 'Failed to remove', error);
+      addDebugInfo('Remove failed');
     }
   };
 
@@ -226,12 +330,36 @@ export default function Watchlist() {
     return `${hours}h ${mins}m`;
   };
 
-  // Get status count with fallback
-  const getStatusCount = (status: string): number => {
-    if (!stats) return 0;
-    const statusData = stats.byStatus.find(s => s.status === status);
-    return statusData?.count || 0;
+  const logCurrentState = () => {
+    debug.log('Watchlist', 'Manual debug trigger');
+    addDebugInfo('Manual debug trigger');
+    console.log('Current watchlist:', watchlist);
+    console.log('Current stats:', stats);
+    
+    // Log detailed watchlist status
+    if (watchlist.length > 0) {
+      console.log('📋 Watchlist items:');
+      watchlist.forEach(item => {
+        console.log(`  - ${item.title}: ${item.watchStatus} (${item.watchTimeMinutes} mins)`);
+      });
+    }
   };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-slate-900 text-slate-50">
+        <Navbar />
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+          <div className="flex items-center justify-center h-64">
+            <div className="text-center">
+              <div className="w-16 h-16 border-4 border-rose-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+              <p className="text-slate-400">Loading your watchlist...</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   if (!user) {
     return (
@@ -265,7 +393,7 @@ export default function Watchlist() {
             <button
               onClick={forceRefreshStats}
               disabled={refreshingStats}
-              className="flex items-center bg-rose-600 hover:bg-rose-700 text-slate-50 px-4 py-2 rounded-lg transition"
+              className="flex items-center bg-rose-600 hover:bg-rose-700 text-slate-50 px-4 py-2 rounded-lg transition disabled:opacity-50"
             >
               {refreshingStats ? (
                 <>
@@ -281,6 +409,34 @@ export default function Watchlist() {
                 </>
               )}
             </button>
+          </div>
+        </div>
+
+        {/* Debug Panel */}
+        <div className="mb-6 p-4 bg-slate-800 rounded-xl border border-slate-700">
+          <div className="flex justify-between items-center mb-2">
+            <h3 className="text-sm font-bold text-rose-400">Debug Console</h3>
+            <button 
+              onClick={() => setDebugInfo([])}
+              className="text-xs text-slate-400 hover:text-slate-300"
+            >
+              Clear
+            </button>
+          </div>
+          <div className="h-32 overflow-y-auto bg-slate-900 rounded p-2 font-mono text-xs">
+            {debugInfo.length === 0 ? (
+              <p className="text-slate-500">No debug messages yet...</p>
+            ) : (
+              debugInfo.map((msg, idx) => (
+                <div key={idx} className="text-slate-300 mb-1">{msg}</div>
+              ))
+            )}
+          </div>
+          <div className="mt-2 text-xs text-slate-500">
+            Watchlist: {watchlist.length} items | 
+            Filter: {activeFilter} |
+            Stats: {stats ? 'Loaded' : 'None'} |
+            Completed: {stats?.completedCount || 0}
           </div>
         </div>
 
@@ -300,7 +456,7 @@ export default function Watchlist() {
               <p className="text-slate-400 text-sm mb-1">Movies</p>
               <p className="text-2xl font-bold">{stats.movieStats.total}</p>
               <div className="mt-2 pt-2 border-t border-slate-700">
-                <p className="text-xs text-slate-500">Watch Time</p>
+                <p className="text-xs text-slate-500">Completed Time</p>
                 <p className="text-sm font-medium text-slate-300">{stats.movieStats.watchTimeFormatted}</p>
               </div>
             </div>
@@ -318,15 +474,15 @@ export default function Watchlist() {
               <p className="text-slate-400 text-sm mb-1">TV Shows</p>
               <p className="text-2xl font-bold">{stats.tvStats.total}</p>
               <div className="mt-2 pt-2 border-t border-slate-700">
-                <p className="text-xs text-slate-500">Watch Time</p>
+                <p className="text-xs text-slate-500">Completed Time</p>
                 <p className="text-sm font-medium text-slate-300">{stats.tvStats.watchTimeFormatted}</p>
               </div>
             </div>
             
-            {/* Total Watch Time */}
+            {/* Total Completed Time */}
             <div className="bg-slate-800 p-6 rounded-2xl border border-slate-700">
               <div className="text-3xl mb-3">⏱️</div>
-              <p className="text-slate-400 text-sm">Total Watch Time</p>
+              <p className="text-slate-400 text-sm">Completed Time</p>
               <p className="text-2xl font-bold">{stats.totalWatchTimeFormatted}</p>
               <div className="mt-2 pt-2 border-t border-slate-700">
                 <p className="text-xs text-slate-500">
@@ -345,8 +501,7 @@ export default function Watchlist() {
               <p className="text-2xl font-bold">{stats.plannedCount}</p>
               <div className="mt-2 pt-2 border-t border-slate-700">
                 <p className="text-xs text-slate-500">
-                  Time: {stats.byStatus.find(s => s.status === "planned")?.time ? 
-                    formatTime(stats.byStatus.find(s => s.status === "planned")?.time || 0) : "0h 0m"}
+                  Items: {stats.byStatus.find(s => s.status === "planned")?.count || 0}
                 </p>
               </div>
             </div>
@@ -364,15 +519,6 @@ export default function Watchlist() {
             </div>
           </div>
         )}
-
-        {/* Debug Info - Remove in production */}
-        <div className="mb-4 p-3 bg-slate-800/50 rounded-lg border border-slate-700">
-          <p className="text-xs text-slate-400">
-            Debug: {watchlist.length} items loaded | 
-            Auto-refresh every 10s | 
-            Check browser console for details
-          </p>
-        </div>
 
         {/* Filter Tabs */}
         <div className="mb-8">
@@ -421,61 +567,44 @@ export default function Watchlist() {
         </div>
 
         {/* Watchlist Content */}
-        {loading ? (
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
-            {Array.from({ length: 8 }).map((_, index) => (
-              <div key={index} className="bg-slate-800 rounded-2xl p-4 animate-pulse">
-                <div className="w-full h-48 bg-slate-700 rounded-xl mb-4"></div>
-                <div className="h-4 bg-slate-700 rounded mb-2"></div>
-                <div className="h-3 bg-slate-700 rounded w-2/3"></div>
-              </div>
-            ))}
-          </div>
-        ) : watchlist.length > 0 ? (
+        {watchlist.length > 0 ? (
           <>
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
               {watchlist.map((item) => (
-                <MovieCard
-                  key={item._id}
-                  media={{
-                    id: item.tmdbId,
-                    title: item.title,
-                    overview: item.overview || "No description available",
-                    poster_path: item.posterPath,
-                    backdrop_path: item.backdrop_path || "",
-                    release_date: item.releaseDate,
-                    vote_average: item.vote_average || 0,
-                    vote_count: item.vote_count || 0,
-                    type: item.type,
-                  }}
-                  isInWatchlist={true}
-                  watchlistId={item._id}
-                  watchStatus={item.watchStatus}
-                  onStatusChange={() => handleStatusUpdate(item._id, "completed")}
-                  showActions={true}
-                />
+                <div key={item._id} className="relative">
+                  <MovieCard
+                    media={{
+                      id: item.tmdbId,
+                      title: item.title,
+                      overview: item.overview || "No description available",
+                      poster_path: item.posterPath,
+                      backdrop_path: item.backdrop_path || "",
+                      release_date: item.releaseDate,
+                      vote_average: item.vote_average || 0,
+                      vote_count: item.vote_count || 0,
+                      type: item.type,
+                    }}
+                    isInWatchlist={true}
+                    watchlistId={item._id}
+                    watchStatus={item.watchStatus}
+                    onStatusChange={(newStatus) => {
+                      debug.log('Watchlist', 'MovieCard onStatusChange triggered', {
+                        itemId: item._id,
+                        title: item.title,
+                        newStatus
+                      });
+                      addDebugInfo(`Status change for "${item.title}": ${item.watchStatus} → ${newStatus}`);
+                      handleStatusUpdate(item._id, newStatus);
+                    }}
+                    showActions={true}
+                  />
+                  {/* Debug overlay for each card */}
+                  <div className="absolute top-2 left-2 bg-black/70 text-white text-xs px-2 py-1 rounded">
+                    {item.watchStatus}
+                  </div>
+                </div>
               ))}
             </div>
-
-            {watchlist.length === 0 && activeFilter !== "all" && (
-              <div className="text-center py-12">
-                <div className="text-6xl mb-4">
-                  {activeFilter === "planned" ? "📋" :
-                   activeFilter === "watching" ? "👀" :
-                   activeFilter === "completed" ? "✅" : "🎬"}
-                </div>
-                <h3 className="text-xl font-bold mb-2">No {activeFilter} items</h3>
-                <p className="text-slate-400 mb-4">
-                  You don't have any {activeFilter} items in your watchlist.
-                </p>
-                <button
-                  onClick={() => setActiveFilter("all")}
-                  className="bg-rose-600 hover:bg-rose-700 text-slate-50 font-medium py-2 px-4 rounded-lg transition"
-                >
-                  View All Items
-                </button>
-              </div>
-            )}
           </>
         ) : (
           <div className="text-center py-12">
@@ -495,29 +624,29 @@ export default function Watchlist() {
           </div>
         )}
 
-        {/* Watchlist Tips */}
-        <div className="mt-12 p-6 bg-slate-800 rounded-2xl border border-slate-700">
-          <h3 className="text-xl font-bold mb-4 flex items-center">
-            <span className="mr-3">💡</span> Watchlist Tips
-          </h3>
-          <ul className="space-y-2 text-slate-300">
-            <li className="flex items-center">
-              <span className="text-rose-400 mr-2">•</span>
-              Click "Completed" to update stats instantly
-            </li>
-            <li className="flex items-center">
-              <span className="text-rose-400 mr-2">•</span>
-              Use "Refresh Now" button if stats don't update
-            </li>
-            <li className="flex items-center">
-              <span className="text-rose-400 mr-2">•</span>
-              Stats auto-refresh every 10 seconds
-            </li>
-            <li className="flex items-center">
-              <span className="text-rose-400 mr-2">•</span>
-              Check browser console for debugging info
-            </li>
-          </ul>
+        {/* Test Controls */}
+        <div className="mt-8 p-6 bg-slate-800/50 rounded-2xl border border-slate-700">
+          <h3 className="text-lg font-bold mb-4 text-rose-400">Test Controls</h3>
+          <div className="flex flex-wrap gap-4">
+            <button
+              onClick={forceRefreshStats}
+              className="bg-slate-700 hover:bg-slate-600 text-slate-300 px-4 py-2 rounded-lg text-sm"
+            >
+              Force Refresh All Data
+            </button>
+            <button
+              onClick={logCurrentState}
+              className="bg-blue-700 hover:bg-blue-600 text-blue-100 px-4 py-2 rounded-lg text-sm"
+            >
+              Log Current State
+            </button>
+            <button
+              onClick={testStatsEndpoint}
+              className="bg-green-700 hover:bg-green-600 text-green-100 px-4 py-2 rounded-lg text-sm"
+            >
+              Test Database Query
+            </button>
+          </div>
         </div>
       </div>
     </div>
