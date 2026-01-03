@@ -218,27 +218,19 @@ export default function MovieCard({
 
         <p className="text-sm text-slate-400 mb-3 line-clamp-2">{truncatedOverview}</p>
 
-        {/* Watch Status Badge */}
+        {/* Quick Stats */}
+        <div className="flex items-center justify-between mt-3 pt-3 border-t border-slate-700">
+          <span className="text-xs text-slate-500">
+            {(media.vote_count || 0).toLocaleString()} votes
+          </span>
+
+                  {/* Watch Status Badge */}
         {inWatchlist && (
           <div className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(currentStatus)}`}>
             <span className="mr-1">{getStatusIcon(currentStatus)}</span>
             {currentStatus.charAt(0).toUpperCase() + currentStatus.slice(1)}
           </div>
         )}
-
-        {/* Quick Stats */}
-        <div className="flex items-center justify-between mt-3 pt-3 border-t border-slate-700">
-          <span className="text-xs text-slate-500">
-            {(media.vote_count || 0).toLocaleString()} votes
-          </span>
-          {inWatchlist && (
-            <Link
-              to={`/watchlist`}
-              className="text-xs text-rose-400 hover:text-rose-300 hover:underline"
-            >
-              View in Watchlist
-            </Link>
-          )}
         </div>
       </div>
     </div>

@@ -14,6 +14,11 @@ interface WatchlistItem {
   watchStatus: "planned" | "watching" | "completed";
   rating?: number;
   watchTimeMinutes: number;
+  // We'll add these from TMDB
+  vote_average?: number;
+  vote_count?: number;
+  overview?: string;
+  backdrop_path?: string;
 }
 
 interface WatchlistStats {
@@ -46,13 +51,70 @@ export default function Watchlist() {
     }
   }, [user, activeFilter, refreshTrigger]);
 
+  // Function to fetch TMDB details for a media item
+  const fetchTMDBDetails = async (tmdbId: number, type: "movie" | "tv"): Promise<any> => {
+    try {
+      const apiKey = import.meta.env.VITE_TMDB_API_KEY;
+      if (!apiKey) {
+        console.error("TMDB API key is missing");
+        return null;
+      }
+
+      const response = await fetch(
+        `https://api.themoviedb.org/3/${type}/${tmdbId}?api_key=${apiKey}&language=en-US`
+      );
+      
+      if (!response.ok) {
+        throw new Error(`TMDB API error: ${response.status}`);
+      }
+      
+      return await response.json();
+    } catch (error) {
+      console.error(`Failed to fetch TMDB details for ${type} ID ${tmdbId}:`, error);
+      return null;
+    }
+  };
+
   const fetchWatchlist = async () => {
     try {
       const status = activeFilter === "all" ? undefined : activeFilter;
       const response = await getWatchlist(1, status);
-      setWatchlist(response.data);
+      
+      // Enrich each watchlist item with TMDB data
+      const enrichedItems = await Promise.all(
+        response.data.map(async (item: WatchlistItem) => {
+          try {
+            // Fetch additional details from TMDB
+            const tmdbData = await fetchTMDBDetails(item.tmdbId, item.type);
+            
+            if (tmdbData) {
+              return {
+                ...item,
+                vote_average: tmdbData.vote_average || 0,
+                vote_count: tmdbData.vote_count || 0,
+                overview: tmdbData.overview || "No description available",
+                backdrop_path: tmdbData.backdrop_path || "",
+              };
+            }
+          } catch (error) {
+            console.error(`Error fetching TMDB data for ${item.title}:`, error);
+          }
+          
+          // Return item with default values if TMDB fetch fails
+          return {
+            ...item,
+            vote_average: 0,
+            vote_count: 0,
+            overview: "No description available",
+            backdrop_path: "",
+          };
+        })
+      );
+      
+      setWatchlist(enrichedItems);
     } catch (error) {
       console.error("Failed to fetch watchlist:", error);
+      setWatchlist([]);
     } finally {
       setLoading(false);
     }
@@ -97,6 +159,13 @@ export default function Watchlist() {
     return statusData?.count || 0;
   };
 
+  // Helper function to get type-specific counts
+  const getTypeCount = (type: "movie" | "tv"): number => {
+    if (!stats) return 0;
+    const typeData = stats.byType.find(t => t.type === type);
+    return typeData?.count || 0;
+  };
+
   if (!user) {
     return (
       <div className="min-h-screen bg-slate-900 text-slate-50 flex items-center justify-center">
@@ -122,11 +191,17 @@ export default function Watchlist() {
 
         {/* Stats Overview */}
         {stats && (
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+          <div className="grid grid-cols-1 md:grid-cols-5 gap-6 mb-8">
             <div className="bg-slate-800 p-6 rounded-2xl border border-slate-700">
-              <div className="text-3xl mb-2">📊</div>
-              <p className="text-slate-400 text-sm">Total Items</p>
-              <p className="text-2xl font-bold">{stats.totalItems}</p>
+              <div className="text-3xl mb-2">🎬</div>
+              <p className="text-slate-400 text-sm">Total Movies</p>
+              <p className="text-2xl font-bold">{getTypeCount("movie")}</p>
+            </div>
+            
+            <div className="bg-slate-800 p-6 rounded-2xl border border-slate-700">
+              <div className="text-3xl mb-2">📺</div>
+              <p className="text-slate-400 text-sm">Total TV Shows</p>
+              <p className="text-2xl font-bold">{getTypeCount("tv")}</p>
             </div>
             
             <div className="bg-slate-800 p-6 rounded-2xl border border-slate-700">
@@ -215,12 +290,12 @@ export default function Watchlist() {
                   media={{
                     id: item.tmdbId,
                     title: item.title,
-                    overview: "",
+                    overview: item.overview || "No description available",
                     poster_path: item.posterPath,
-                    backdrop_path: "",
+                    backdrop_path: item.backdrop_path || "",
                     release_date: item.releaseDate,
-                    vote_average: 0,
-                    vote_count: 0, 
+                    vote_average: item.vote_average || 0,
+                    vote_count: item.vote_count || 0,
                     type: item.type,
                   }}
                   isInWatchlist={true}
