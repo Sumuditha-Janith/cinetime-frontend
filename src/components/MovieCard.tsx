@@ -28,13 +28,13 @@ interface MovieCardProps {
 }
 
 export default function MovieCard({
-    media,
-    isInWatchlist = false,
-    watchlistId,
-    watchStatus,
-    onStatusChange,
-    showActions = true
-}: MovieCardProps) {
+                                      media,
+                                      isInWatchlist = false,
+                                      watchlistId,
+                                      watchStatus,
+                                      onStatusChange,
+                                      showActions = true
+                                  }: MovieCardProps) {
     const { user } = useAuth();
     const [loading, setLoading] = useState(false);
     const [inWatchlist, setInWatchlist] = useState(isInWatchlist);
@@ -55,19 +55,19 @@ export default function MovieCard({
     }, [isInWatchlist, watchStatus, watchlistId, media.title]);
 
     const getMediaType = (): "movie" | "tv" => {
-    // Check media.type first
-    if (media.type && (media.type === "movie" || media.type === "tv")) {
-        return media.type;
-    }
-    
-    // Then check media.media_type
-    if (media.media_type && (media.media_type === "movie" || media.media_type === "tv")) {
-        return media.media_type;
-    }
-    
-    // Default to movie
-    return "movie";
-};
+        // Check media.type first
+        if (media.type && (media.type === "movie" || media.type === "tv")) {
+            return media.type;
+        }
+
+        // Then check media.media_type
+        if (media.media_type && (media.media_type === "movie" || media.media_type === "tv")) {
+            return media.media_type;
+        }
+
+        // Default to movie
+        return "movie";
+    };
 
     const posterUrl = TMDBService.getImageUrl(media.poster_path, "w342");
     const releaseYear = TMDBService.getReleaseYear(media.release_date);
@@ -83,9 +83,9 @@ export default function MovieCard({
 
         setLoading(true);
         try {
-            debug.log('MovieCard', 'Adding to watchlist', { 
-                title: media.title, 
-                type: mediaType 
+            debug.log('MovieCard', 'Adding to watchlist', {
+                title: media.title,
+                type: mediaType
             });
 
             if (mediaType === "movie") {
@@ -288,21 +288,21 @@ export default function MovieCard({
                             )}
 
                             <Link
-    to={`/media/${getMediaType()}/${media.id}`}
-    className="block w-full bg-slate-800/90 hover:bg-slate-700/90 text-slate-300 hover:text-slate-50 font-medium py-2 px-4 rounded-lg transition duration-200 text-center"
-    onClick={() => {
-        console.log(`Navigating to: /media/${getMediaType()}/${media.id}`);
-        console.log('Media object:', {
-            id: media.id,
-            title: media.title,
-            type: media.type,
-            media_type: media.media_type,
-            getMediaType: getMediaType()
-        });
-    }}
->
-    View Details
-</Link>
+                                to={`/media/${getMediaType()}/${media.id}`}
+                                className="block w-full bg-slate-800/90 hover:bg-slate-700/90 text-slate-300 hover:text-slate-50 font-medium py-2 px-4 rounded-lg transition duration-200 text-center"
+                                onClick={() => {
+                                    console.log(`Navigating to: /media/${getMediaType()}/${media.id}`);
+                                    console.log('Media object:', {
+                                        id: media.id,
+                                        title: media.title,
+                                        type: media.type,
+                                        media_type: media.media_type,
+                                        getMediaType: getMediaType()
+                                    });
+                                }}
+                            >
+                                View Details
+                            </Link>
                         </div>
                     </div>
                 )}
