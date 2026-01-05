@@ -56,6 +56,16 @@ interface MediaDetails {
       vote_average: number;
     }>;
   };
+  // TV Show specific fields
+  first_air_date?: string;
+  number_of_seasons?: number;
+  number_of_episodes?: number;
+  episode_run_time?: number[];
+  seasons?: Array<{
+    season_number: number;
+    episode_count: number;
+    name: string;
+  }>;
 }
 
 interface WatchlistItem {
@@ -65,7 +75,7 @@ interface WatchlistItem {
 }
 
 export default function MediaDetails() {
-  const { type, id } = useParams<{ type: "movie" | "tv"; id: string }>();
+  const { type, id } = useParams<{ type: string; id: string }>(); // Make type string, not "movie" | "tv"
   const navigate = useNavigate();
   const { user } = useAuth();
   
@@ -78,6 +88,21 @@ export default function MediaDetails() {
   const [isAdding, setIsAdding] = useState(false);
   const [activeTab, setActiveTab] = useState<"overview" | "cast" | "similar">("overview");
 
+  // Validate and normalize type
+  const getValidType = (): "movie" | "tv" => {
+    if (type === "movie" || type === "tv") {
+      return type;
+    }
+    // Try to infer from the media data if available
+    if (media?.type) {
+      return media.type;
+    }
+    // Default to movie
+    return "movie";
+  };
+
+  const mediaType = getValidType();
+
   useEffect(() => {
     if (type && id) {
       fetchMediaDetails();
@@ -88,11 +113,24 @@ export default function MediaDetails() {
   const fetchMediaDetails = async () => {
     try {
       setLoading(true);
-      const response = await getMediaDetails(parseInt(id!), type!);
-      setMedia(response.data);
+      console.log(`Fetching ${mediaType} details for ID: ${id}`);
+      
+      const response = await getMediaDetails(parseInt(id!), mediaType);
+      console.log("Media details response:", response);
+      
+      if (response.data) {
+        // Ensure the type is set correctly in the media object
+        const mediaData = {
+          ...response.data,
+          type: mediaType
+        };
+        setMedia(mediaData);
+      } else {
+        throw new Error("No data received");
+      }
     } catch (err: any) {
-      setError(err.response?.data?.message || "Failed to fetch media details");
       console.error("Error fetching media details:", err);
+      setError(err.response?.data?.message || err.message || "Failed to fetch media details");
     } finally {
       setLoading(false);
     }
@@ -127,17 +165,34 @@ export default function MediaDetails() {
 
     setIsAdding(true);
     try {
-      const response = await addToWatchlist({
-        tmdbId: media.id,
-        title: media.title,
-        type: media.type,
-        posterPath: media.poster_path,
-        releaseDate: media.release_date,
-      });
-      
-      setInWatchlist(true);
-      setWatchlistId(response.data._id);
-      setWatchStatus("planned");
+      if (mediaType === "movie") {
+        const response = await addToWatchlist({
+          tmdbId: media.id,
+          title: media.title,
+          type: "movie",
+          posterPath: media.poster_path,
+          releaseDate: media.release_date,
+        });
+        
+        setInWatchlist(true);
+        setWatchlistId(response.data._id);
+        setWatchStatus("planned");
+      } else {
+        // For TV shows, use a different endpoint
+        // We'll need to add this to our media.service
+        // For now, let's use the same endpoint
+        const response = await addToWatchlist({
+          tmdbId: media.id,
+          title: media.title,
+          type: "tv",
+          posterPath: media.poster_path,
+          releaseDate: media.release_date || media.first_air_date || "",
+        });
+        
+        setInWatchlist(true);
+        setWatchlistId(response.data._id);
+        setWatchStatus("planned");
+      }
     } catch (err: any) {
       alert(err.response?.data?.message || "Failed to add to watchlist");
     } finally {
@@ -191,7 +246,17 @@ export default function MediaDetails() {
   };
 
   const getYearFromDate = (dateString: string): string => {
+    if (!dateString) return "Unknown";
     return new Date(dateString).getFullYear().toString();
+  };
+
+  // Get appropriate date for display
+  const getDisplayDate = () => {
+    if (mediaType === "movie") {
+      return media?.release_date || "";
+    } else {
+      return media?.first_air_date || media?.release_date || "";
+    }
   };
 
   if (loading) {
@@ -221,7 +286,10 @@ export default function MediaDetails() {
           <div className="text-center py-12">
             <div className="text-6xl mb-4">😔</div>
             <h1 className="text-2xl font-bold mb-2">Media Not Found</h1>
-            <p className="text-slate-400 mb-6">{error || "The requested media could not be found."}</p>
+            <p className="text-slate-400 mb-4">{error || "The requested media could not be found."}</p>
+            <p className="text-sm text-slate-500 mb-6">
+              Type: {type}, ID: {id}, Media Type: {mediaType}
+            </p>
             <button
               onClick={() => navigate(-1)}
               className="bg-rose-600 hover:bg-rose-700 text-slate-50 font-medium py-2 px-6 rounded-lg transition"
@@ -289,15 +357,25 @@ export default function MediaDetails() {
                     ⭐ {media.vote_average.toFixed(1)}
                   </span>
                   <span className="text-slate-400">
-                    {getYearFromDate(media.release_date)}
+                    {getYearFromDate(getDisplayDate())}
                   </span>
-                  {media.type === "movie" && media.runtime && (
+                  {mediaType === "movie" && media.runtime && (
                     <span className="text-slate-400">
                       {formatRuntime(media.runtime)}
                     </span>
                   )}
+                  {mediaType === "tv" && (
+                    <>
+                      <span className="text-slate-400">
+                        {media.number_of_seasons || 1} season{media.number_of_seasons !== 1 ? 's' : ''}
+                      </span>
+                      <span className="text-slate-400">
+                        {media.number_of_episodes || 1} episode{media.number_of_episodes !== 1 ? 's' : ''}
+                      </span>
+                    </>
+                  )}
                   <span className="px-2 py-1 bg-slate-700 rounded text-sm">
-                    {media.type === "movie" ? "🎬 Movie" : "📺 TV Show"}
+                    {mediaType === "movie" ? "🎬 Movie" : "📺 TV Show"}
                   </span>
                 </div>
 
@@ -397,22 +475,34 @@ export default function MediaDetails() {
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
                 <div className="bg-slate-900/50 p-4 rounded-xl">
                   <p className="text-sm text-slate-400">Votes</p>
-                  <p className="text-xl font-bold">{media.vote_count.toLocaleString()}</p>
+                  <p className="text-xl font-bold">{media.vote_count?.toLocaleString() || "N/A"}</p>
                 </div>
                 <div className="bg-slate-900/50 p-4 rounded-xl">
                   <p className="text-sm text-slate-400">Status</p>
-                  <p className="text-xl font-bold">{media.status}</p>
+                  <p className="text-xl font-bold">{media.status || "N/A"}</p>
                 </div>
-                {media.budget && media.budget > 0 && (
+                {mediaType === "movie" && media.budget && media.budget > 0 && (
                   <div className="bg-slate-900/50 p-4 rounded-xl">
                     <p className="text-sm text-slate-400">Budget</p>
                     <p className="text-xl font-bold">{formatCurrency(media.budget)}</p>
                   </div>
                 )}
-                {media.revenue && media.revenue > 0 && (
+                {mediaType === "movie" && media.revenue && media.revenue > 0 && (
                   <div className="bg-slate-900/50 p-4 rounded-xl">
                     <p className="text-sm text-slate-400">Revenue</p>
                     <p className="text-xl font-bold">{formatCurrency(media.revenue)}</p>
+                  </div>
+                )}
+                {mediaType === "tv" && media.number_of_seasons && (
+                  <div className="bg-slate-900/50 p-4 rounded-xl">
+                    <p className="text-sm text-slate-400">Seasons</p>
+                    <p className="text-xl font-bold">{media.number_of_seasons}</p>
+                  </div>
+                )}
+                {mediaType === "tv" && media.number_of_episodes && (
+                  <div className="bg-slate-900/50 p-4 rounded-xl">
+                    <p className="text-sm text-slate-400">Episodes</p>
+                    <p className="text-xl font-bold">{media.number_of_episodes}</p>
                   </div>
                 )}
               </div>
@@ -551,7 +641,7 @@ export default function MediaDetails() {
                 {media.similar.results.slice(0, 10).map((item) => (
                   <Link
                     key={item.id}
-                    to={`/media/${media.type}/${item.id}`}
+                    to={`/media/${mediaType}/${item.id}`}
                     className="group"
                   >
                     <div className="bg-slate-900 rounded-xl overflow-hidden transition transform group-hover:scale-105">
@@ -571,7 +661,7 @@ export default function MediaDetails() {
                           {item.title || item.name}
                         </p>
                         <p className="text-sm text-rose-400">
-                          ⭐ {item.vote_average.toFixed(1)}
+                          ⭐ {item.vote_average?.toFixed(1) || "N/A"}
                         </p>
                       </div>
                     </div>
@@ -588,9 +678,9 @@ export default function MediaDetails() {
             <div>
               <h3 className="text-xl font-bold mb-2">Watch Time</h3>
               <p className="text-slate-400">
-                This {media.type === "movie" ? "movie" : "TV show"} will add{" "}
+                This {mediaType === "movie" ? "movie" : "TV show"} will add{" "}
                 <span className="text-rose-400 font-bold">
-                  {media.watchTimeMinutes || (media.type === "movie" ? 120 : 45)} minutes
+                  {media.watchTimeMinutes || (mediaType === "movie" ? 120 : 45)} minutes
                 </span>{" "}
                 to your total watch time.
               </p>

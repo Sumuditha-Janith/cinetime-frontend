@@ -88,8 +88,23 @@ export const searchMedia = async (query: string, page: number = 1) => {
 };
 
 export const getMediaDetails = async (tmdbId: number, type: "movie" | "tv") => {
-  const res = await api.get(`/media/details/${type}/${tmdbId}`);
-  return res.data;
+    if (!tmdbId || !type) {
+        throw new Error("TMDB ID and type are required");
+    }
+    
+    if (type !== "movie" && type !== "tv") {
+        throw new Error("Invalid media type. Must be 'movie' or 'tv'");
+    }
+    
+    console.log(`API: Fetching ${type} details for ID: ${tmdbId}`);
+    
+    try {
+        const res = await api.get(`/media/details/${type}/${tmdbId}`);
+        return res.data;
+    } catch (error: any) {
+        console.error(`Failed to fetch ${type} details for ID ${tmdbId}:`, error);
+        throw error;
+    }
 };
 
 export const addToWatchlist = async (data: {

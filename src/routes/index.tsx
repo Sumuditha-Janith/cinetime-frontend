@@ -15,8 +15,7 @@ const Watchlist = lazy(() => import("../pages/Watchlist"));
 const MediaDetails = lazy(() => import("../pages/MediaDetails"));
 const SearchResults = lazy(() => import("../pages/SearchResults")); // Add this
 
-// Layout component for authenticated pages
-const AuthenticatedLayout = lazy(() => import("../components/AuthenticatedLayout"));
+// const AuthenticatedLayout = lazy(() => import("../components/AuthenticatedLayout"));
 
 export default function Router() {
   return (
