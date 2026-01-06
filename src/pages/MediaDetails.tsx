@@ -4,10 +4,12 @@ import { getMediaDetails, addToWatchlist, removeFromWatchlist, updateWatchStatus
 import { getWatchlist } from "../services/media.service";
 import Navbar from "../components/Navbar";
 import { useAuth } from "../context/authContext";
+import api from "../services/api";
 
 interface MediaDetails {
     id: number;
     title: string;
+    name?: string;
     overview: string;
     poster_path: string;
     backdrop_path: string;
@@ -75,7 +77,7 @@ interface WatchlistItem {
 }
 
 export default function MediaDetails() {
-    const { type, id } = useParams<{ type: string; id: string }>(); // Make type string, not "movie" | "tv"
+    const { type, id } = useParams<{ type: string; id: string }>();
     const navigate = useNavigate();
     const { user } = useAuth();
 
@@ -88,16 +90,13 @@ export default function MediaDetails() {
     const [isAdding, setIsAdding] = useState(false);
     const [activeTab, setActiveTab] = useState<"overview" | "cast" | "similar">("overview");
 
-    // Validate and normalize type
     const getValidType = (): "movie" | "tv" => {
         if (type === "movie" || type === "tv") {
             return type;
         }
-        // Try to infer from the media data if available
         if (media?.type) {
             return media.type;
         }
-        // Default to movie
         return "movie";
     };
 
@@ -119,10 +118,10 @@ export default function MediaDetails() {
             console.log("Media details response:", response);
 
             if (response.data) {
-                // Ensure the type is set correctly in the media object
                 const mediaData = {
                     ...response.data,
-                    type: mediaType
+                    type: mediaType,
+                    title: response.data.title || response.data.name || "Unknown Title"
                 };
                 setMedia(mediaData);
             } else {
@@ -165,6 +164,15 @@ export default function MediaDetails() {
 
         setIsAdding(true);
         try {
+            console.log("Adding to watchlist, media data:", {
+                tmdbId: media.id,
+                title: media.title,
+                type: mediaType,
+                posterPath: media.poster_path,
+                backdrop_path: media.backdrop_path,
+                releaseDate: media.release_date || media.first_air_date || ""
+            });
+
             if (mediaType === "movie") {
                 const response = await addToWatchlist({
                     tmdbId: media.id,
@@ -178,23 +186,35 @@ export default function MediaDetails() {
                 setWatchlistId(response.data._id);
                 setWatchStatus("planned");
             } else {
-                // For TV shows, use a different endpoint
-                // We'll need to add this to our media.service
-                // For now, let's use the same endpoint
-                const response = await addToWatchlist({
+                const tvShowData = {
                     tmdbId: media.id,
                     title: media.title,
-                    type: "tv",
+                    type: "tv" as const,
                     posterPath: media.poster_path,
-                    releaseDate: media.release_date || media.first_air_date || "",
-                });
+                    backdrop_path: media.backdrop_path,
+                    releaseDate: media.first_air_date || media.release_date || ""
+                };
+
+                console.log("Sending TV show data:", tvShowData);
+
+                const response = await api.post("/media/watchlist/tv", tvShowData);
 
                 setInWatchlist(true);
-                setWatchlistId(response.data._id);
+                setWatchlistId(response.data.data._id);
                 setWatchStatus("planned");
             }
+            
+            alert(`Added to ${mediaType === "movie" ? "movies" : "TV shows"} watchlist successfully!`);
         } catch (err: any) {
-            alert(err.response?.data?.message || "Failed to add to watchlist");
+            console.error("Error adding to watchlist:", err);
+            const errorMessage = err.response?.data?.message || "Failed to add to watchlist";
+            alert(errorMessage);
+            
+            // If it's already in watchlist, update the local state
+            if (errorMessage.includes("already in your watchlist")) {
+                setInWatchlist(true);
+                await checkWatchlist(); // Refresh to get the watchlist ID
+            }
         } finally {
             setIsAdding(false);
         }
@@ -250,13 +270,19 @@ export default function MediaDetails() {
         return new Date(dateString).getFullYear().toString();
     };
 
-    // Get appropriate date for display
     const getDisplayDate = () => {
         if (mediaType === "movie") {
             return media?.release_date || "";
         } else {
             return media?.first_air_date || media?.release_date || "";
         }
+    };
+
+    const getDisplayTitle = () => {
+        if (media) {
+            return media.title || media.name || "Unknown Title";
+        }
+        return "Unknown Title";
     };
 
     if (loading) {
@@ -302,8 +328,10 @@ export default function MediaDetails() {
         );
     }
 
-    const backdropUrl = `https://image.tmdb.org/t/p/original${media.backdrop_path}`;
-    const posterUrl = `https://image.tmdb.org/t/p/w500${media.poster_path}`;
+    const backdropUrl = media.backdrop_path ? `https://image.tmdb.org/t/p/original${media.backdrop_path}` : "/placeholder-backdrop.jpg";
+    const posterUrl = media.poster_path ? `https://image.tmdb.org/t/p/w500${media.poster_path}` : "/placeholder-poster.jpg";
+    const displayTitle = getDisplayTitle();
+    const displayDate = getDisplayDate();
 
     return (
         <div className="min-h-screen bg-slate-900 text-slate-50">
@@ -313,7 +341,7 @@ export default function MediaDetails() {
             <div className="relative h-96 overflow-hidden">
                 <img
                     src={backdropUrl}
-                    alt={media.title}
+                    alt={displayTitle}
                     className="w-full h-full object-cover"
                 />
                 <div className="absolute inset-0 bg-gradient-to-t from-slate-900 via-slate-900/80 to-transparent"></div>
@@ -340,7 +368,7 @@ export default function MediaDetails() {
                         <div className="bg-slate-800 rounded-2xl overflow-hidden shadow-2xl">
                             <img
                                 src={posterUrl}
-                                alt={media.title}
+                                alt={displayTitle}
                                 className="w-full h-auto"
                             />
                         </div>
@@ -351,32 +379,32 @@ export default function MediaDetails() {
                         <div className="bg-slate-800/90 backdrop-blur-sm rounded-2xl p-8 border border-slate-700">
                             {/* Title and Basic Info */}
                             <div className="mb-6">
-                                <h1 className="text-4xl font-bold mb-2">{media.title}</h1>
+                                <h1 className="text-4xl font-bold mb-2">{displayTitle}</h1>
                                 <div className="flex items-center space-x-4 mb-4">
-                  <span className="text-rose-400 font-bold text-lg">
-                    ⭐ {media.vote_average.toFixed(1)}
-                  </span>
+                                    <span className="text-rose-400 font-bold text-lg">
+                                        ⭐ {media.vote_average?.toFixed(1) || "N/A"}
+                                    </span>
                                     <span className="text-slate-400">
-                    {getYearFromDate(getDisplayDate())}
-                  </span>
+                                        {getYearFromDate(displayDate)}
+                                    </span>
                                     {mediaType === "movie" && media.runtime && (
                                         <span className="text-slate-400">
-                      {formatRuntime(media.runtime)}
-                    </span>
+                                            {formatRuntime(media.runtime)}
+                                        </span>
                                     )}
                                     {mediaType === "tv" && (
                                         <>
-                      <span className="text-slate-400">
-                        {media.number_of_seasons || 1} season{media.number_of_seasons !== 1 ? 's' : ''}
-                      </span>
                                             <span className="text-slate-400">
-                        {media.number_of_episodes || 1} episode{media.number_of_episodes !== 1 ? 's' : ''}
-                      </span>
+                                                {media.number_of_seasons || 1} season{media.number_of_seasons !== 1 ? 's' : ''}
+                                            </span>
+                                            <span className="text-slate-400">
+                                                {media.number_of_episodes || 1} episode{media.number_of_episodes !== 1 ? 's' : ''}
+                                            </span>
                                         </>
                                     )}
                                     <span className="px-2 py-1 bg-slate-700 rounded text-sm">
-                    {mediaType === "movie" ? "🎬 Movie" : "📺 TV Show"}
-                  </span>
+                                        {mediaType === "movie" ? "🎬 Movie" : "📺 TV Show"}
+                                    </span>
                                 </div>
 
                                 {/* Tagline */}
@@ -385,16 +413,18 @@ export default function MediaDetails() {
                                 )}
 
                                 {/* Genres */}
-                                <div className="flex flex-wrap gap-2 mb-6">
-                                    {media.genres?.map((genre) => (
-                                        <span
-                                            key={genre.id}
-                                            className="px-3 py-1 bg-slate-700 rounded-full text-sm"
-                                        >
-                      {genre.name}
-                    </span>
-                                    ))}
-                                </div>
+                                {media.genres && media.genres.length > 0 && (
+                                    <div className="flex flex-wrap gap-2 mb-6">
+                                        {media.genres.map((genre) => (
+                                            <span
+                                                key={genre.id}
+                                                className="px-3 py-1 bg-slate-700 rounded-full text-sm"
+                                            >
+                                                {genre.name}
+                                            </span>
+                                        ))}
+                                    </div>
+                                )}
                             </div>
 
                             {/* Watchlist Actions */}
@@ -428,8 +458,8 @@ export default function MediaDetails() {
                                                 {isAdding ? "Removing..." : "Remove from Watchlist"}
                                             </button>
                                             <span className="text-sm text-slate-400">
-                        In your watchlist
-                      </span>
+                                                In your watchlist
+                                            </span>
                                         </div>
 
                                         {/* Status Selector - Different for movies and TV shows */}
@@ -654,56 +684,63 @@ export default function MediaDetails() {
                         <div className="bg-slate-800 rounded-2xl p-8 border border-slate-700">
                             <h2 className="text-2xl font-bold mb-6">Similar Titles</h2>
                             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-6">
-                                {media.similar.results.slice(0, 10).map((item) => (
-                                    <Link
-                                        key={item.id}
-                                        to={`/media/${mediaType}/${item.id}`}
-                                        className="group"
-                                    >
-                                        <div className="bg-slate-900 rounded-xl overflow-hidden transition transform group-hover:scale-105">
-                                            {item.poster_path ? (
-                                                <img
-                                                    src={`https://image.tmdb.org/t/p/w185${item.poster_path}`}
-                                                    alt={item.title || item.name}
-                                                    className="w-full h-48 object-cover"
-                                                />
-                                            ) : (
-                                                <div className="w-full h-48 bg-slate-800 flex items-center justify-center">
-                                                    <span className="text-3xl">🎬</span>
+                                {media.similar.results.slice(0, 10).map((item) => {
+                                    const similarTitle = item.title || item.name || "Unknown";
+                                    const similarType = item.title ? "movie" : "tv";
+                                    
+                                    return (
+                                        <Link
+                                            key={item.id}
+                                            to={`/media/${similarType}/${item.id}`}
+                                            className="group"
+                                        >
+                                            <div className="bg-slate-900 rounded-xl overflow-hidden transition transform group-hover:scale-105">
+                                                {item.poster_path ? (
+                                                    <img
+                                                        src={`https://image.tmdb.org/t/p/w185${item.poster_path}`}
+                                                        alt={similarTitle}
+                                                        className="w-full h-48 object-cover"
+                                                    />
+                                                ) : (
+                                                    <div className="w-full h-48 bg-slate-800 flex items-center justify-center">
+                                                        <span className="text-3xl">🎬</span>
+                                                    </div>
+                                                )}
+                                                <div className="p-3">
+                                                    <p className="font-medium text-slate-50 truncate">
+                                                        {similarTitle}
+                                                    </p>
+                                                    <p className="text-sm text-rose-400">
+                                                        ⭐ {item.vote_average?.toFixed(1) || "N/A"}
+                                                    </p>
                                                 </div>
-                                            )}
-                                            <div className="p-3">
-                                                <p className="font-medium text-slate-50 truncate">
-                                                    {item.title || item.name}
-                                                </p>
-                                                <p className="text-sm text-rose-400">
-                                                    ⭐ {item.vote_average?.toFixed(1) || "N/A"}
-                                                </p>
                                             </div>
-                                        </div>
-                                    </Link>
-                                ))}
+                                        </Link>
+                                    );
+                                })}
                             </div>
                         </div>
                     )}
                 </div>
 
                 {/* Watch Time Info */}
-                <div className="bg-slate-800 rounded-2xl p-6 border border-slate-700 mb-8">
-                    <div className="flex items-center justify-between">
-                        <div>
-                            <h3 className="text-xl font-bold mb-2">Watch Time</h3>
-                            <p className="text-slate-400">
-                                This {mediaType === "movie" ? "movie" : "TV show"} will add{" "}
-                                <span className="text-rose-400 font-bold">
-                  {media.watchTimeMinutes || (mediaType === "movie" ? 120 : 45)} minutes
-                </span>{" "}
-                                to your total watch time.
-                            </p>
+                {media.watchTimeMinutes && (
+                    <div className="bg-slate-800 rounded-2xl p-6 border border-slate-700 mb-8">
+                        <div className="flex items-center justify-between">
+                            <div>
+                                <h3 className="text-xl font-bold mb-2">Watch Time</h3>
+                                <p className="text-slate-400">
+                                    This {mediaType === "movie" ? "movie" : "TV show"} will add{" "}
+                                    <span className="text-rose-400 font-bold">
+                                        {media.watchTimeMinutes} minutes
+                                    </span>{" "}
+                                    to your total watch time.
+                                </p>
+                            </div>
+                            <div className="text-4xl">⏱️</div>
                         </div>
-                        <div className="text-4xl">⏱️</div>
                     </div>
-                </div>
+                )}
             </div>
         </div>
     );

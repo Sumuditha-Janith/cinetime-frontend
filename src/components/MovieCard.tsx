@@ -1,10 +1,9 @@
 import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
-import { addToWatchlist, removeFromWatchlist, updateWatchStatus } from "../services/media.service";
+import { addToWatchlist, addTVShowToWatchlist, removeFromWatchlist, updateWatchStatus } from "../services/media.service";
 import TMDBService from "../services/tmdb.service";
 import { useAuth } from "../context/authContext";
 import { debug } from "../utils/debug";
-import api from "../services/api";
 
 interface MovieCardProps {
     media: {
@@ -75,59 +74,59 @@ export default function MovieCard({
     const truncatedOverview = TMDBService.truncateOverview(media.overview);
     const mediaType = getMediaType();
 
-    const handleAddToWatchlist = async () => {
-        if (!user) {
-            alert("Please login to add to watchlist");
-            return;
-        }
+const handleAddToWatchlist = async () => {
+    if (!user) {
+        alert("Please login to add to watchlist");
+        return;
+    }
 
-        setLoading(true);
-        try {
-            debug.log('MovieCard', 'Adding to watchlist', {
+    setLoading(true);
+    try {
+        debug.log('MovieCard', 'Adding to watchlist', {
+            title: media.title,
+            type: mediaType
+        });
+
+        if (mediaType === "movie") {
+            // Add movie to watchlist
+            await addToWatchlist({
+                tmdbId: media.id,
                 title: media.title,
-                type: mediaType
+                type: "movie",
+                posterPath: media.poster_path,
+                releaseDate: media.release_date,
             });
-
-            if (mediaType === "movie") {
-                // Add movie to watchlist
-                await addToWatchlist({
-                    tmdbId: media.id,
-                    title: media.title,
-                    type: "movie",
-                    posterPath: media.poster_path,
-                    releaseDate: media.release_date,
-                });
-            } else {
-                // Add TV show to watchlist (with different endpoint)
-                await api.post("/media/watchlist/tv", {
-                    tmdbId: media.id,
-                    title: media.title,
-                    type: "tv",
-                    posterPath: media.poster_path,
-                    backdrop_path: media.backdrop_path,
-                    releaseDate: media.release_date,
-                });
-            }
-
-            setInWatchlist(true);
-            setCurrentStatus("planned");
-            if (onStatusChange) {
-                debug.log('MovieCard', 'Calling onStatusChange for add', { status: "planned" });
-                onStatusChange("planned");
-            }
-            alert(`Added to ${mediaType === "movie" ? "movies" : "TV shows"} watchlist successfully!`);
-        } catch (error: any) {
-            debug.error('MovieCard', 'Failed to add to watchlist', error);
-            if (error.response?.status === 400 && error.response?.data?.message?.includes("already in your watchlist")) {
-                alert("This item is already in your watchlist!");
-                setInWatchlist(true);
-            } else {
-                alert(error.response?.data?.message || `Failed to add to ${mediaType} watchlist`);
-            }
-        } finally {
-            setLoading(false);
+        } else {
+            // Add TV show to watchlist
+            await addTVShowToWatchlist({
+                tmdbId: media.id,
+                title: media.title,
+                type: "tv",
+                posterPath: media.poster_path,
+                backdrop_path: media.backdrop_path,
+                releaseDate: media.release_date,
+            });
         }
-    };
+
+        setInWatchlist(true);
+        setCurrentStatus("planned");
+        if (onStatusChange) {
+            debug.log('MovieCard', 'Calling onStatusChange for add', { status: "planned" });
+            onStatusChange("planned");
+        }
+        alert(`Added to ${mediaType === "movie" ? "movies" : "TV shows"} watchlist successfully!`);
+    } catch (error: any) {
+        debug.error('MovieCard', 'Failed to add to watchlist', error);
+        if (error.response?.status === 400 && error.response?.data?.message?.includes("already in your watchlist")) {
+            alert("This item is already in your watchlist!");
+            setInWatchlist(true);
+        } else {
+            alert(error.response?.data?.message || `Failed to add to ${mediaType} watchlist`);
+        }
+    } finally {
+        setLoading(false);
+    }
+};
 
     const handleRemoveFromWatchlist = async () => {
         if (!watchlistId) return;

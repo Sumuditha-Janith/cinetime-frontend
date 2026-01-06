@@ -118,6 +118,18 @@ export const addToWatchlist = async (data: {
     return res.data;
 };
 
+export const addTVShowToWatchlist = async (data: {
+    tmdbId: number;
+    title: string;
+    type: "tv";
+    posterPath?: string;
+    backdrop_path?: string;
+    releaseDate?: string;
+}) => {
+    const res = await api.post("/media/watchlist/tv", data);
+    return res.data;
+};
+
 export const getWatchlist = async (page: number = 1, status?: string) => {
     const url = status
         ? `/media/watchlist?page=${page}&status=${status}`
