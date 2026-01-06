@@ -1,3 +1,4 @@
+// cinetime-frontend/components/Watchlist.tsx
 import { useState, useEffect } from "react";
 import {
     getWatchlist,
@@ -372,54 +373,60 @@ export default function Watchlist() {
                 </div>
 
                 {/* Stats Overview */}
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-                    {/* Movie Stats */}
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6 mb-8">
+                    {/* 1. Movie Time - Completed movies only */}
                     <div className="bg-slate-800 p-6 rounded-2xl border border-slate-700">
                         <div className="flex items-center justify-between mb-3">
                             <div className="text-3xl">🎬</div>
-                            <span className={`text-sm font-bold ${movieCounts.completed > 0 ? "text-green-400" : "text-slate-400"}`}>
-                                {movieCounts.completed}/{movieCounts.all}
-                            </span>
+
                         </div>
-                        <p className="text-slate-400 text-sm mb-1">Movies</p>
-                        <p className="text-2xl font-bold">{movieCounts.all}</p>
+                        <p className="text-slate-400 text-sm mb-1">Movie Time</p>
+                        <p className="text-2xl font-bold">{stats?.movieStats?.watchTimeFormatted || "0h 0m"}</p>
                         <div className="mt-2 pt-2 border-t border-slate-700">
-                            <p className="text-xs text-slate-500">Completed Time</p>
-                            <p className="text-sm font-medium text-slate-300">
-                                {stats?.movieStats?.watchTimeFormatted || "0h 0m"}
-                            </p>
+                            <p className="text-xs text-slate-500">From {stats?.movieStats?.completed || 0} movies</p>
                         </div>
                     </div>
 
-                    {/* TV Shows */}
+                    {/* 2. Movies Watched - Completed movies count */}
                     <div className="bg-slate-800 p-6 rounded-2xl border border-slate-700">
-                        <div className="text-3xl mb-3">📺</div>
-                        <p className="text-slate-400 text-sm">TV Shows</p>
-                        <p className="text-2xl font-bold">{tvShowCounts.all}</p>
+                        <div className="flex items-center justify-between mb-3">
+                            <div className="text-3xl">🎥</div>
+                        </div>
+                        <p className="text-slate-400 text-sm mb-1">Movies Watched</p>
+                        <p className="text-2xl font-bold">{stats?.movieStats?.completed || 0}</p>
                         <div className="mt-2 pt-2 border-t border-slate-700">
-                            <p className="text-xs text-slate-500">Episodes Watched</p>
-                            <p className="text-sm font-medium text-slate-300">
-                                {episodeStats?.summary?.totalWatched || 0} episodes
-                            </p>
+                            <p className="text-xs text-slate-500">Out of {movieCounts.all} total</p>
                         </div>
                     </div>
 
-                    {/* Episodes Watched */}
+                    {/* 3. TV Time - Completed TV shows only */}
+                    <div className="bg-slate-800 p-6 rounded-2xl border border-slate-700">
+                        <div className="flex items-center justify-between mb-3">
+                            <div className="text-3xl">📺</div>
+                        </div>
+                        <p className="text-slate-400 text-sm mb-1">TV Time</p>
+                        <p className="text-2xl font-bold">{stats?.tvStats?.watchTimeFormatted || "0h 0m"}</p>
+                        <div className="mt-2 pt-2 border-t border-slate-700">
+                            <p className="text-xs text-slate-500">From {episodeStats?.summary?.totalWatched || 0} episodes</p>
+                        </div>
+                    </div>
+
+                    {/* 4. Episodes Watched */}
                     <div className="bg-slate-800 p-6 rounded-2xl border border-slate-700">
                         <div className="text-3xl mb-3">📊</div>
                         <p className="text-slate-400 text-sm">Episodes Watched</p>
                         <p className="text-2xl font-bold">{episodeStats?.summary?.totalWatched || 0}</p>
                         <div className="mt-2 pt-2 border-t border-slate-700">
                             <p className="text-xs text-slate-500">
-                                {episodeStats?.summary?.watchedEpisodes || 0} watched • {episodeStats?.summary?.skippedEpisodes || 0} skipped
+                                {/* {episodeStats?.summary?.watchedEpisodes || 0} watched • {episodeStats?.summary?.skippedEpisodes || 0} skipped */}
                             </p>
                         </div>
                     </div>
 
-                    {/* Total Watch Time */}
+                    {/* 5. Total Time */}
                     <div className="bg-slate-800 p-6 rounded-2xl border border-slate-700">
                         <div className="text-3xl mb-3">⏱️</div>
-                        <p className="text-slate-400 text-sm">Total Watch Time</p>
+                        <p className="text-slate-400 text-sm">Total Time</p>
                         <p className="text-2xl font-bold">{stats?.totalWatchTimeFormatted || "0h 0m"}</p>
                         <div className="mt-2 pt-2 border-t border-slate-700">
                             <p className="text-xs text-slate-500">
