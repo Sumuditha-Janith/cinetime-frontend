@@ -27,8 +27,6 @@ interface WatchlistItem {
     vote_average?: number;
     vote_count?: number;
     overview?: string;
-
-    // TV Show specific fields
     seasonCount?: number;
     episodeCount?: number;
     totalEpisodesWatched?: number;
@@ -52,32 +50,27 @@ interface WatchlistStats {
     totalItems: number;
     totalWatchTime: number;
     totalWatchTimeFormatted: string;
-
     movieStats: {
         total: number;
         completed: number;
         watchTime: number;
         watchTimeFormatted: string;
     };
-
     tvStats: {
         total: number;
         completed: number;
         watchTime: number;
         watchTimeFormatted: string;
     };
-
     byStatus: Array<{
         status: string;
         count: number;
         time: number;
     }>;
-
     byType: Array<{
         type: string;
         count: number;
     }>;
-
     plannedCount: number;
     watchingCount: number;
     completedCount: number;
@@ -92,8 +85,14 @@ export default function Watchlist() {
     const [episodeStats, setEpisodeStats] = useState<any>(null);
     const [loading, setLoading] = useState(true);
     const [refreshingStats, setRefreshingStats] = useState(false);
-    const [activeFilter, setActiveFilter] = useState<string>("all");
+    
+    // Separate filters for movies and TV shows
+    const [movieFilter, setMovieFilter] = useState<"all" | "planned" | "completed">("all");
+    const [tvFilter, setTvFilter] = useState<"all" | "planned" | "watching" | "completed">("all");
+    
+    // Content type state
     const [contentType, setContentType] = useState<"movies" | "tv">("movies");
+    
     const [lastUpdated, setLastUpdated] = useState<Date>(new Date());
     const [debugInfo, setDebugInfo] = useState<string[]>([]);
     const [expandedTVShow, setExpandedTVShow] = useState<string | null>(null);
@@ -109,14 +108,22 @@ export default function Watchlist() {
             fetchWatchlist();
             fetchStats();
         }
-    }, [user, activeFilter]);
+    }, [user]);
+
+    // Fetch watchlist when filter changes
+    useEffect(() => {
+        if (user) {
+            fetchWatchlist();
+        }
+    }, [movieFilter, tvFilter, contentType]);
 
     const fetchWatchlist = async () => {
         try {
             addDebugInfo('Fetching watchlist...');
-            const status = activeFilter === "all" ? undefined : activeFilter;
-            const response = await getWatchlist(1, status);
-
+            
+            // Fetch all watchlist items without filter
+            const response = await getWatchlist(1);
+            
             debug.log('Watchlist', 'Watchlist API response', {
                 items: response.data.length,
                 data: response.data
@@ -124,15 +131,16 @@ export default function Watchlist() {
             addDebugInfo(`Got ${response.data.length} watchlist items`);
 
             // Separate movies and TV shows
-            const moviesList = response.data.filter((item: WatchlistItem) => item.type === "movie");
-            const tvShowsList = response.data.filter((item: WatchlistItem) => item.type === "tv");
+            const allMovies = response.data.filter((item: WatchlistItem) => item.type === "movie");
+            const allTVShows = response.data.filter((item: WatchlistItem) => item.type === "tv");
 
-            setMovies(moviesList);
-            setTVShows(tvShowsList);
+            // Apply filters
+            const filteredMovies = filterMovies(allMovies);
+            const filteredTVShows = filterTVShows(allTVShows);
+
+            setMovies(filteredMovies);
+            setTVShows(filteredTVShows);
             setWatchlist(response.data);
-
-            // Calculate local stats from watchlist
-            calculateLocalStats(response.data);
         } catch (error: any) {
             debug.error('Watchlist', 'Failed to fetch watchlist', error);
             addDebugInfo(`Error fetching watchlist: ${error.message}`);
@@ -142,6 +150,18 @@ export default function Watchlist() {
         } finally {
             setLoading(false);
         }
+    };
+
+    // Helper function to filter movies
+    const filterMovies = (moviesList: WatchlistItem[]): WatchlistItem[] => {
+        if (movieFilter === "all") return moviesList;
+        return moviesList.filter(movie => movie.watchStatus === movieFilter);
+    };
+
+    // Helper function to filter TV shows
+    const filterTVShows = (tvList: WatchlistItem[]): WatchlistItem[] => {
+        if (tvFilter === "all") return tvList;
+        return tvList.filter(tv => tv.watchStatus === tvFilter);
     };
 
     const fetchStats = async () => {
@@ -161,102 +181,7 @@ export default function Watchlist() {
         } catch (error: any) {
             debug.error('Watchlist', 'Failed to fetch stats', error);
             addDebugInfo(`Error fetching stats: ${error.message}`);
-
-            // Fall back to local calculation if API fails
-            if (watchlist.length > 0) {
-                addDebugInfo('Using local stats calculation');
-                calculateLocalStats(watchlist);
-            }
         }
-    };
-
-    const calculateLocalStats = (items: WatchlistItem[]) => {
-        if (!items.length) {
-            setStats(null);
-            return;
-        }
-
-        const totalItems = items.length;
-
-        // Calculate movie stats
-        const movies = items.filter(item => item.type === "movie");
-        const completedMovies = movies.filter(item => item.watchStatus === "completed");
-        const movieWatchTime = completedMovies.reduce((sum, item) => sum + (item.watchTimeMinutes || 0), 0);
-
-        // Calculate TV show stats (from episodeStats if available, otherwise from local data)
-        const tvShows = items.filter(item => item.type === "tv");
-
-        let tvWatchTime = 0;
-        let totalEpisodesWatched = 0;
-
-        if (episodeStats) {
-            // Use episode statistics if available
-            tvWatchTime = episodeStats.summary?.totalWatchTime || 0;
-            totalEpisodesWatched = episodeStats.summary?.totalWatched || 0;
-        } else {
-            // Fall back to local calculation - sum up all TV show watch times
-            tvWatchTime = tvShows.reduce((sum, item) => sum + (item.totalWatchTime || 0), 0);
-            totalEpisodesWatched = tvShows.reduce((sum, item) => sum + (item.totalEpisodesWatched || 0), 0);
-        }
-
-        // Calculate planned, watching, completed counts
-        const plannedItems = items.filter(item => item.watchStatus === "planned");
-        const watchingItems = items.filter(item => item.watchStatus === "watching");
-        const completedCount = completedMovies.length + tvShows.filter(item => item.watchStatus === "completed").length;
-
-        // Format times
-        const formatTime = (minutes: number): string => {
-            const hours = Math.floor(minutes / 60);
-            const mins = minutes % 60;
-            return `${hours}h ${mins}m`;
-        };
-
-        // Build byStatus array
-        const byStatus = [
-            { status: "planned", count: plannedItems.length, time: 0 },
-            { status: "watching", count: watchingItems.length, time: 0 },
-            { status: "completed", count: completedCount, time: movieWatchTime + tvWatchTime }
-        ].filter(s => s.count > 0);
-
-        // Build byType array
-        const byType = [
-            { type: "movie", count: movies.length },
-            { type: "tv", count: tvShows.length }
-        ];
-
-        const localStats = {
-            totalItems,
-            totalWatchTime: movieWatchTime + tvWatchTime,
-            totalWatchTimeFormatted: formatTime(movieWatchTime + tvWatchTime),
-
-            movieStats: {
-                total: movies.length,
-                completed: completedMovies.length,
-                watchTime: movieWatchTime,
-                watchTimeFormatted: formatTime(movieWatchTime)
-            },
-
-            tvStats: {
-                total: tvShows.length,
-                completed: 0, // We don't track completed TV shows
-                watchTime: tvWatchTime,
-                watchTimeFormatted: formatTime(tvWatchTime)
-            },
-
-            byStatus,
-            byType,
-
-            plannedCount: plannedItems.length,
-            watchingCount: watchingItems.length,
-            completedCount,
-        };
-
-        console.log("📊 Calculated local stats:", {
-            movieWatchTime,
-            tvWatchTime,
-            totalWatchTime: movieWatchTime + tvWatchTime
-        });
-        setStats(localStats);
     };
 
     const forceRefreshStats = async () => {
@@ -277,7 +202,6 @@ export default function Watchlist() {
         debug.log('Watchlist', 'handleStatusUpdate called', { mediaId, newStatus });
         addDebugInfo(`Updating status for ${mediaId} to ${newStatus}`);
 
-        // Find the item being updated
         const itemToUpdate = watchlist.find(item => item._id === mediaId);
         if (!itemToUpdate) {
             debug.error('Watchlist', 'Item not found in watchlist', { mediaId });
@@ -292,13 +216,12 @@ export default function Watchlist() {
             type: itemToUpdate.type
         });
 
-        // If it's a TV show and we're marking it as "watching", auto-expand it
         if (itemToUpdate.type === "tv" && newStatus === "watching") {
             addDebugInfo(`Auto-expanding TV show: ${itemToUpdate.title}`);
             setExpandedTVShow(itemToUpdate._id);
         }
 
-        // Update local state immediately (optimistic update)
+        // Update local state
         if (itemToUpdate.type === "movie") {
             setMovies(prev => prev.map(item =>
                 item._id === mediaId ? { ...item, watchStatus: newStatus } : item
@@ -309,30 +232,19 @@ export default function Watchlist() {
             ));
         }
 
-        setWatchlist(prev => prev.map(item =>
-            item._id === mediaId
-                ? { ...item, watchStatus: newStatus }
-                : item
-        ));
-
         try {
-            // Call the API to update status
             const response = await updateWatchStatus(mediaId, { watchStatus: newStatus });
             console.log('✅ API Response:', response);
             addDebugInfo(`API: Status updated to ${newStatus} for "${itemToUpdate.title}"`);
 
-            // Refresh stats to ensure consistency
             await forceRefreshStats();
-
         } catch (error: any) {
             debug.error('Watchlist', 'Status update failed', error);
             console.error('❌ API Error:', error.response?.data || error.message);
             addDebugInfo(`Update failed: ${error.response?.data?.message || error.message}`);
-
-            // Revert on error
             await fetchWatchlist();
         }
-    }
+    };
 
     const handleRemove = async (mediaId: string) => {
         debug.log('Watchlist', 'handleRemove called', { mediaId });
@@ -347,21 +259,9 @@ export default function Watchlist() {
     };
 
     const handleEpisodeStatusChange = async () => {
-        // When episodes change, refresh the stats
         await forceRefreshStats();
     };
 
-    const getFilteredMovies = () => {
-        if (activeFilter === "all") return movies;
-        return movies.filter(movie => movie.watchStatus === activeFilter);
-    };
-
-    const getFilteredTVShows = () => {
-        if (activeFilter === "all") return tvShows;
-        return tvShows.filter(tv => tv.watchStatus === activeFilter);
-    };
-
-    // Helper function to convert WatchlistItem to TVShowDetails
     const convertToTVShowDetails = (item: WatchlistItem): TVShowDetails => {
         return {
             _id: item._id,
@@ -380,6 +280,29 @@ export default function Watchlist() {
     const toggleTVShowExpand = (showId: string) => {
         setExpandedTVShow(expandedTVShow === showId ? null : showId);
     };
+
+    // Get counts for filter tabs
+    const getMovieCounts = () => {
+        const allMovies = watchlist.filter(item => item.type === "movie");
+        return {
+            all: allMovies.length,
+            planned: allMovies.filter(m => m.watchStatus === "planned").length,
+            completed: allMovies.filter(m => m.watchStatus === "completed").length
+        };
+    };
+
+    const getTVShowCounts = () => {
+        const allTVShows = watchlist.filter(item => item.type === "tv");
+        return {
+            all: allTVShows.length,
+            planned: allTVShows.filter(t => t.watchStatus === "planned").length,
+            watching: allTVShows.filter(t => t.watchStatus === "watching").length,
+            completed: allTVShows.filter(t => t.watchStatus === "completed").length
+        };
+    };
+
+    const movieCounts = getMovieCounts();
+    const tvShowCounts = getTVShowCounts();
 
     if (loading) {
         return (
@@ -448,18 +371,18 @@ export default function Watchlist() {
                     </div>
                 </div>
 
-                {/* Stats Overview - SIMPLIFIED */}
+                {/* Stats Overview */}
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
                     {/* Movie Stats */}
                     <div className="bg-slate-800 p-6 rounded-2xl border border-slate-700">
                         <div className="flex items-center justify-between mb-3">
                             <div className="text-3xl">🎬</div>
-                            <span className={`text-sm font-bold ${(stats?.movieStats?.completed || 0) > 0 ? "text-green-400" : "text-slate-400"}`}>
-                                {(stats?.movieStats?.completed || 0)}/{(stats?.movieStats?.total || 0)}
+                            <span className={`text-sm font-bold ${movieCounts.completed > 0 ? "text-green-400" : "text-slate-400"}`}>
+                                {movieCounts.completed}/{movieCounts.all}
                             </span>
                         </div>
                         <p className="text-slate-400 text-sm mb-1">Movies</p>
-                        <p className="text-2xl font-bold">{stats?.movieStats?.total || 0}</p>
+                        <p className="text-2xl font-bold">{movieCounts.all}</p>
                         <div className="mt-2 pt-2 border-t border-slate-700">
                             <p className="text-xs text-slate-500">Completed Time</p>
                             <p className="text-sm font-medium text-slate-300">
@@ -472,7 +395,7 @@ export default function Watchlist() {
                     <div className="bg-slate-800 p-6 rounded-2xl border border-slate-700">
                         <div className="text-3xl mb-3">📺</div>
                         <p className="text-slate-400 text-sm">TV Shows</p>
-                        <p className="text-2xl font-bold">{stats?.tvStats?.total || 0}</p>
+                        <p className="text-2xl font-bold">{tvShowCounts.all}</p>
                         <div className="mt-2 pt-2 border-t border-slate-700">
                             <p className="text-xs text-slate-500">Episodes Watched</p>
                             <p className="text-sm font-medium text-slate-300">
@@ -519,7 +442,7 @@ export default function Watchlist() {
                                 : "text-slate-400 hover:text-slate-300"
                             }`}
                         >
-                            🎬 Movies ({getFilteredMovies().length})
+                            🎬 Movies ({movieCounts.all})
                         </button>
                         <button
                             onClick={() => setContentType("tv")}
@@ -528,247 +451,289 @@ export default function Watchlist() {
                                 : "text-slate-400 hover:text-slate-300"
                             }`}
                         >
-                            📺 TV Shows ({getFilteredTVShows().length})
+                            📺 TV Shows ({tvShowCounts.all})
                         </button>
                     </div>
                 </div>
 
-                {/* Filter Tabs */}
-                <div className="mb-4">
-                    <div className="flex space-x-1 border-b border-slate-700">
-                        <button
-                            onClick={() => setActiveFilter("all")}
-                            className={`px-4 py-3 font-medium text-sm transition ${activeFilter === "all"
-                                ? "text-rose-400 border-b-2 border-rose-400"
-                                : "text-slate-400 hover:text-slate-300"
-                            }`}
-                        >
-                            All ({stats?.totalItems || 0})
-                        </button>
-                        <button
-                            onClick={() => setActiveFilter("planned")}
-                            className={`px-4 py-3 font-medium text-sm transition ${activeFilter === "planned"
-                                ? "text-rose-400 border-b-2 border-rose-400"
-                                : "text-slate-400 hover:text-slate-300"
-                            }`}
-                        >
-                            Planned ({stats?.plannedCount || 0})
-                        </button>
-                        <button
-                            onClick={() => setActiveFilter("watching")}
-                            className={`px-4 py-3 font-medium text-sm transition ${activeFilter === "watching"
-                                ? "text-rose-400 border-b-2 border-rose-400"
-                                : "text-slate-400 hover:text-slate-300"
-                            }`}
-                        >
-                            Watching ({stats?.watchingCount || 0})
-                        </button>
-                        <button
-                            onClick={() => setActiveFilter("completed")}
-                            className={`px-4 py-3 font-medium text-sm transition ${activeFilter === "completed"
-                                ? "text-rose-400 border-b-2 border-rose-400"
-                                : "text-slate-400 hover:text-slate-300"
-                            }`}
-                        >
-                            Completed ({stats?.completedCount || 0})
-                        </button>
-                    </div>
-                </div>
-
-                {/* Separated Content */}
-                {contentType === "movies" ? (
-                    // Movies Section
-                    getFilteredMovies().length > 0 ? (
-                        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
-                            {getFilteredMovies().map((item) => (
-                                <div key={item._id} className="relative">
-                                    <MovieCard
-                                        media={{
-                                            id: item.tmdbId,
-                                            title: item.title,
-                                            overview: item.overview || "No description available",
-                                            poster_path: item.posterPath,
-                                            backdrop_path: item.backdrop_path || "",
-                                            release_date: item.releaseDate,
-                                            vote_average: item.vote_average || 0,
-                                            vote_count: item.vote_count || 0,
-                                            type: "movie",
-                                        }}
-                                        isInWatchlist={true}
-                                        watchlistId={item._id}
-                                        watchStatus={item.watchStatus}
-                                        onStatusChange={(newStatus) => {
-                                            debug.log('Watchlist', 'MovieCard onStatusChange triggered', {
-                                                itemId: item._id,
-                                                title: item.title,
-                                                newStatus
-                                            });
-                                            addDebugInfo(`Status change for "${item.title}": ${item.watchStatus} → ${newStatus}`);
-                                            handleStatusUpdate(item._id, newStatus);
-                                        }}
-                                        showActions={true}
-                                    />
-                                </div>
-                            ))}
-                        </div>
-                    ) : (
-                        <div className="text-center py-12">
-                            <div className="inline-block p-6 bg-slate-800 rounded-2xl mb-6">
-                                <span className="text-6xl">🎬</span>
-                            </div>
-                            <h3 className="text-2xl font-bold mb-2">
-                                {activeFilter === "all"
-                                    ? "No movies in your watchlist"
-                                    : `No ${activeFilter} movies`
-                                }
-                            </h3>
-                            <p className="text-slate-400 mb-6 max-w-md mx-auto">
-                                {activeFilter === "all"
-                                    ? "Start building your watchlist by searching for movies you want to watch"
-                                    : `Try adding some movies to your ${activeFilter} list`
-                                }
-                            </p>
-                            <a
-                                href="/movies"
-                                className="inline-block bg-rose-600 hover:bg-rose-700 text-slate-50 font-bold py-3 px-6 rounded-lg transition duration-200"
+                {/* Movie Filter Tabs */}
+                {contentType === "movies" && (
+                    <div className="mb-6">
+                        <div className="flex space-x-1 border-b border-slate-700">
+                            <button
+                                onClick={() => setMovieFilter("all")}
+                                className={`px-4 py-3 font-medium text-sm transition ${movieFilter === "all"
+                                    ? "text-rose-400 border-b-2 border-rose-400"
+                                    : "text-slate-400 hover:text-slate-300"
+                                }`}
                             >
-                                Discover Movies
-                            </a>
+                                All ({movieCounts.all})
+                            </button>
+                            <button
+                                onClick={() => setMovieFilter("planned")}
+                                className={`px-4 py-3 font-medium text-sm transition ${movieFilter === "planned"
+                                    ? "text-rose-400 border-b-2 border-rose-400"
+                                    : "text-slate-400 hover:text-slate-300"
+                                }`}
+                            >
+                                Planned ({movieCounts.planned})
+                            </button>
+                            <button
+                                onClick={() => setMovieFilter("completed")}
+                                className={`px-4 py-3 font-medium text-sm transition ${movieFilter === "completed"
+                                    ? "text-rose-400 border-b-2 border-rose-400"
+                                    : "text-slate-400 hover:text-slate-300"
+                                }`}
+                            >
+                                Completed ({movieCounts.completed})
+                            </button>
                         </div>
-                    )
-                ) : (
-                    // TV Shows Section
-                    getFilteredTVShows().length > 0 ? (
-                        <div className="space-y-6">
-                            {getFilteredTVShows().map((item) => {
-                                const tvShow: TVShowDetails = convertToTVShowDetails(item);
-                                const isExpanded = expandedTVShow === item._id;
+                    </div>
+                )}
 
-                                return (
-                                    <div key={item._id} className="bg-slate-800 rounded-xl border border-slate-700 p-6">
-                                        <div className="flex flex-col md:flex-row space-y-4 md:space-y-0 md:space-x-6">
-                                            {/* TV Show Poster */}
-                                            <div className="md:w-48 flex-shrink-0">
-                                                <div className="relative">
-                                                    <img
-                                                        src={TMDBService.getImageUrl(item.posterPath, "w342")}
-                                                        alt={item.title}
-                                                        className="w-full h-auto rounded-lg shadow-lg"
-                                                    />
-                                                    <div className="absolute top-2 right-2 bg-slate-900/80 backdrop-blur-sm px-2 py-1 rounded-full">
-                                                        <span className="text-sm font-bold text-rose-400">
-                                                            ⭐ {item.vote_average?.toFixed(1) || "N/A"}
-                                                        </span>
-                                                    </div>
-                                                </div>
-                                            </div>
+                {/* TV Show Filter Tabs */}
+                {contentType === "tv" && (
+                    <div className="mb-6">
+                        <div className="flex space-x-1 border-b border-slate-700">
+                            <button
+                                onClick={() => setTvFilter("all")}
+                                className={`px-4 py-3 font-medium text-sm transition ${tvFilter === "all"
+                                    ? "text-rose-400 border-b-2 border-rose-400"
+                                    : "text-slate-400 hover:text-slate-300"
+                                }`}
+                            >
+                                All ({tvShowCounts.all})
+                            </button>
+                            <button
+                                onClick={() => setTvFilter("planned")}
+                                className={`px-4 py-3 font-medium text-sm transition ${tvFilter === "planned"
+                                    ? "text-rose-400 border-b-2 border-rose-400"
+                                    : "text-slate-400 hover:text-slate-300"
+                                }`}
+                            >
+                                Planned ({tvShowCounts.planned})
+                            </button>
+                            <button
+                                onClick={() => setTvFilter("watching")}
+                                className={`px-4 py-3 font-medium text-sm transition ${tvFilter === "watching"
+                                    ? "text-rose-400 border-b-2 border-rose-400"
+                                    : "text-slate-400 hover:text-slate-300"
+                                }`}
+                            >
+                                Watching ({tvShowCounts.watching})
+                            </button>
+                            <button
+                                onClick={() => setTvFilter("completed")}
+                                className={`px-4 py-3 font-medium text-sm transition ${tvFilter === "completed"
+                                    ? "text-rose-400 border-b-2 border-rose-400"
+                                    : "text-slate-400 hover:text-slate-300"
+                                }`}
+                            >
+                                Completed ({tvShowCounts.completed})
+                            </button>
+                        </div>
+                    </div>
+                )}
 
-                                            {/* TV Show Info */}
-                                            <div className="flex-1 min-w-0">
-                                                <div className="flex justify-between items-start mb-4">
-                                                    <div>
-                                                        <h3 className="text-2xl font-bold text-slate-50 mb-2">{item.title}</h3>
-                                                        <div className="flex items-center space-x-3">
-                                                            <span className="text-sm text-slate-400">
-                                                                📅 {item.releaseDate ? new Date(item.releaseDate).getFullYear() : "Unknown"}
-                                                            </span>
-                                                            <span className="text-sm text-slate-400">
-                                                                📺 {item.seasonCount || 1} season{item.seasonCount !== 1 ? 's' : ''}
-                                                            </span>
-                                                            <span className="text-sm text-slate-400">
-                                                                🎬 {item.episodeCount || 1} episode{item.episodeCount !== 1 ? 's' : ''}
-                                                            </span>
-                                                            <span className={`px-3 py-1 rounded-full text-xs font-medium ${item.watchStatus === "completed" ? "bg-green-600 text-green-100" :
-                                                                item.watchStatus === "watching" ? "bg-blue-600 text-blue-100" :
-                                                                    "bg-slate-600 text-slate-300"
-                                                            }`}>
-                                                                {item.watchStatus}
+                {/* Movies Content */}
+                {contentType === "movies" && (
+                    <>
+                        {movies.length > 0 ? (
+                            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+                                {movies.map((item) => (
+                                    <div key={item._id} className="relative">
+                                        <MovieCard
+                                            media={{
+                                                id: item.tmdbId,
+                                                title: item.title,
+                                                overview: item.overview || "No description available",
+                                                poster_path: item.posterPath,
+                                                backdrop_path: item.backdrop_path || "",
+                                                release_date: item.releaseDate,
+                                                vote_average: item.vote_average || 0,
+                                                vote_count: item.vote_count || 0,
+                                                type: "movie",
+                                            }}
+                                            isInWatchlist={true}
+                                            watchlistId={item._id}
+                                            watchStatus={item.watchStatus}
+                                            onStatusChange={(newStatus) => {
+                                                debug.log('Watchlist', 'MovieCard onStatusChange triggered', {
+                                                    itemId: item._id,
+                                                    title: item.title,
+                                                    newStatus
+                                                });
+                                                addDebugInfo(`Status change for "${item.title}": ${item.watchStatus} → ${newStatus}`);
+                                                handleStatusUpdate(item._id, newStatus);
+                                            }}
+                                            showActions={true}
+                                        />
+                                    </div>
+                                ))}
+                            </div>
+                        ) : (
+                            <div className="text-center py-12">
+                                <div className="inline-block p-6 bg-slate-800 rounded-2xl mb-6">
+                                    <span className="text-6xl">🎬</span>
+                                </div>
+                                <h3 className="text-2xl font-bold mb-2">
+                                    {movieFilter === "all"
+                                        ? "No movies in your watchlist"
+                                        : `No ${movieFilter} movies`
+                                    }
+                                </h3>
+                                <p className="text-slate-400 mb-6 max-w-md mx-auto">
+                                    {movieFilter === "all"
+                                        ? "Start building your watchlist by searching for movies you want to watch"
+                                        : `Try adding some movies to your ${movieFilter} list`
+                                    }
+                                </p>
+                                <a
+                                    href="/movies"
+                                    className="inline-block bg-rose-600 hover:bg-rose-700 text-slate-50 font-bold py-3 px-6 rounded-lg transition duration-200"
+                                >
+                                    Discover Movies
+                                </a>
+                            </div>
+                        )}
+                    </>
+                )}
+
+                {/* TV Shows Content */}
+                {contentType === "tv" && (
+                    <>
+                        {tvShows.length > 0 ? (
+                            <div className="space-y-6">
+                                {tvShows.map((item) => {
+                                    const tvShow: TVShowDetails = convertToTVShowDetails(item);
+                                    const isExpanded = expandedTVShow === item._id;
+
+                                    return (
+                                        <div key={item._id} className="bg-slate-800 rounded-xl border border-slate-700 p-6">
+                                            <div className="flex flex-col md:flex-row space-y-4 md:space-y-0 md:space-x-6">
+                                                {/* TV Show Poster */}
+                                                <div className="md:w-48 flex-shrink-0">
+                                                    <div className="relative">
+                                                        <img
+                                                            src={TMDBService.getImageUrl(item.posterPath, "w342")}
+                                                            alt={item.title}
+                                                            className="w-full h-auto rounded-lg shadow-lg"
+                                                        />
+                                                        <div className="absolute top-2 right-2 bg-slate-900/80 backdrop-blur-sm px-2 py-1 rounded-full">
+                                                            <span className="text-sm font-bold text-rose-400">
+                                                                ⭐ {item.vote_average?.toFixed(1) || "N/A"}
                                                             </span>
                                                         </div>
                                                     </div>
-
-                                                    <div className="flex space-x-2">
-                                                        <button
-                                                            onClick={() => toggleTVShowExpand(item._id)}
-                                                            className="text-slate-400 hover:text-rose-400 px-3 py-1 rounded-lg hover:bg-slate-700 transition"
-                                                            title={isExpanded ? "Collapse episodes" : "Show episodes"}
-                                                        >
-                                                            {isExpanded ? "▲" : "▼"} Episodes
-                                                        </button>
-                                                        <button
-                                                            onClick={() => handleRemove(item._id)}
-                                                            className="text-slate-400 hover:text-rose-400 px-3 py-1 rounded-lg hover:bg-slate-700 transition"
-                                                            title="Remove from watchlist"
-                                                        >
-                                                            Remove
-                                                        </button>
-                                                    </div>
                                                 </div>
 
-                                                <p className="text-slate-300 mb-4 line-clamp-2">
-                                                    {item.overview || "No description available"}
-                                                </p>
+                                                {/* TV Show Info */}
+                                                <div className="flex-1 min-w-0">
+                                                    <div className="flex justify-between items-start mb-4">
+                                                        <div>
+                                                            <h3 className="text-2xl font-bold text-slate-50 mb-2">{item.title}</h3>
+                                                            <div className="flex items-center space-x-3">
+                                                                <span className="text-sm text-slate-400">
+                                                                    📅 {item.releaseDate ? new Date(item.releaseDate).getFullYear() : "Unknown"}
+                                                                </span>
+                                                                <span className="text-sm text-slate-400">
+                                                                    📺 {item.seasonCount || 1} season{item.seasonCount !== 1 ? 's' : ''}
+                                                                </span>
+                                                                <span className="text-sm text-slate-400">
+                                                                    🎬 {item.episodeCount || 1} episode{item.episodeCount !== 1 ? 's' : ''}
+                                                                </span>
+                                                                <span className={`px-3 py-1 rounded-full text-xs font-medium ${item.watchStatus === "completed" ? "bg-green-600 text-green-100" :
+                                                                    item.watchStatus === "watching" ? "bg-blue-600 text-blue-100" :
+                                                                        "bg-slate-600 text-slate-300"
+                                                                }`}>
+                                                                    {item.watchStatus}
+                                                                </span>
+                                                            </div>
+                                                        </div>
 
-                                                {/* Episode Progress */}
-                                                <div className="mb-4">
-                                                    <div className="flex justify-between items-center mb-1">
-                                                        <span className="text-sm text-slate-400">
-                                                            Episode Progress: {item.totalEpisodesWatched || 0}/{item.episodeCount || 1} episodes
-                                                        </span>
-                                                        <span className="text-sm text-rose-400">
-                                                            {item.episodeCount ? Math.round(((item.totalEpisodesWatched || 0) / item.episodeCount) * 100) : 0}%
-                                                        </span>
+                                                        <div className="flex space-x-2">
+                                                            <button
+                                                                onClick={() => toggleTVShowExpand(item._id)}
+                                                                className="text-slate-400 hover:text-rose-400 px-3 py-1 rounded-lg hover:bg-slate-700 transition"
+                                                                title={isExpanded ? "Collapse episodes" : "Show episodes"}
+                                                            >
+                                                                {isExpanded ? "▲" : "▼"} Episodes
+                                                            </button>
+                                                            <button
+                                                                onClick={() => handleRemove(item._id)}
+                                                                className="text-slate-400 hover:text-rose-400 px-3 py-1 rounded-lg hover:bg-slate-700 transition"
+                                                                title="Remove from watchlist"
+                                                            >
+                                                                Remove
+                                                            </button>
+                                                        </div>
                                                     </div>
-                                                    <div className="h-2 bg-slate-700 rounded-full overflow-hidden">
-                                                        <div
-                                                            className="h-full bg-green-500 rounded-full"
-                                                            style={{
-                                                                width: `${item.episodeCount ? ((item.totalEpisodesWatched || 0) / item.episodeCount) * 100 : 0}%`
-                                                            }}
-                                                        ></div>
+
+                                                    <p className="text-slate-300 mb-4 line-clamp-2">
+                                                        {item.overview || "No description available"}
+                                                    </p>
+
+                                                    {/* Episode Progress */}
+                                                    <div className="mb-4">
+                                                        <div className="flex justify-between items-center mb-1">
+                                                            <span className="text-sm text-slate-400">
+                                                                Episode Progress: {item.totalEpisodesWatched || 0}/{item.episodeCount || 1} episodes
+                                                            </span>
+                                                            <span className="text-sm text-rose-400">
+                                                                {item.episodeCount ? Math.round(((item.totalEpisodesWatched || 0) / item.episodeCount) * 100) : 0}%
+                                                            </span>
+                                                        </div>
+                                                        <div className="h-2 bg-slate-700 rounded-full overflow-hidden">
+                                                            <div
+                                                                className="h-full bg-green-500 rounded-full"
+                                                                style={{
+                                                                    width: `${item.episodeCount ? ((item.totalEpisodesWatched || 0) / item.episodeCount) * 100 : 0}%`
+                                                                }}
+                                                            ></div>
+                                                        </div>
                                                     </div>
+
+                                                    {/* Episode Tracker (Expanded) */}
+                                                    {isExpanded && (
+                                                        <div className="mt-4">
+                                                            <TVEpisodeTracker
+                                                                tvShow={tvShow}
+                                                                onEpisodeStatusChange={handleEpisodeStatusChange}
+                                                            />
+                                                        </div>
+                                                    )}
                                                 </div>
-
-                                                {/* Episode Tracker (Expanded) */}
-                                                {isExpanded && (
-                                                    <div className="mt-4">
-                                                        <TVEpisodeTracker
-                                                            tvShow={tvShow}
-                                                            onEpisodeStatusChange={handleEpisodeStatusChange}
-                                                        />
-                                                    </div>
-                                                )}
                                             </div>
                                         </div>
-                                    </div>
-                                );
-                            })}
-                        </div>
-                    ) : (
-                        <div className="text-center py-12">
-                            <div className="inline-block p-6 bg-slate-800 rounded-2xl mb-6">
-                                <span className="text-6xl">📺</span>
+                                    );
+                                })}
                             </div>
-                            <h3 className="text-2xl font-bold mb-2">
-                                {activeFilter === "all"
-                                    ? "No TV shows in your watchlist"
-                                    : `No ${activeFilter} TV shows`
-                                }
-                            </h3>
-                            <p className="text-slate-400 mb-6 max-w-md mx-auto">
-                                {activeFilter === "all"
-                                    ? "Add TV shows to track episodes and seasons individually"
-                                    : `Try adding some TV shows to your ${activeFilter} list`
-                                }
-                            </p>
-                            <a
-                                href="/movies"
-                                className="inline-block bg-rose-600 hover:bg-rose-700 text-slate-50 font-bold py-3 px-6 rounded-lg transition duration-200"
-                            >
-                                Discover TV Shows
-                            </a>
-                        </div>
-                    )
+                        ) : (
+                            <div className="text-center py-12">
+                                <div className="inline-block p-6 bg-slate-800 rounded-2xl mb-6">
+                                    <span className="text-6xl">📺</span>
+                                </div>
+                                <h3 className="text-2xl font-bold mb-2">
+                                    {tvFilter === "all"
+                                        ? "No TV shows in your watchlist"
+                                        : `No ${tvFilter} TV shows`
+                                    }
+                                </h3>
+                                <p className="text-slate-400 mb-6 max-w-md mx-auto">
+                                    {tvFilter === "all"
+                                        ? "Add TV shows to track episodes and seasons individually"
+                                        : `Try adding some TV shows to your ${tvFilter} list`
+                                    }
+                                </p>
+                                <a
+                                    href="/tvshows"
+                                    className="inline-block bg-rose-600 hover:bg-rose-700 text-slate-50 font-bold py-3 px-6 rounded-lg transition duration-200"
+                                >
+                                    Discover TV Shows
+                                </a>
+                            </div>
+                        )}
+                    </>
                 )}
 
                 {/* Debug Panel */}
