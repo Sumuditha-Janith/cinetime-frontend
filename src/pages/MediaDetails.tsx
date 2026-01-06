@@ -67,6 +67,9 @@ interface MediaDetails {
         season_number: number;
         episode_count: number;
         name: string;
+        air_date?: string;
+        poster_path?: string;
+        overview?: string;
     }>;
 }
 
@@ -74,6 +77,30 @@ interface WatchlistItem {
     _id: string;
     tmdbId: number;
     watchStatus: "planned" | "watching" | "completed";
+}
+
+interface Episode {
+    id: number;
+    episode_number: number;
+    name: string;
+    overview: string;
+    still_path: string;
+    air_date: string;
+    runtime: number;
+    vote_average: number;
+    vote_count: number;
+    crew: Array<any>;
+    guest_stars: Array<any>;
+}
+
+interface Season {
+    season_number: number;
+    name: string;
+    episode_count: number;
+    poster_path: string;
+    air_date: string;
+    overview: string;
+    episodes: Episode[];
 }
 
 export default function MediaDetails() {
@@ -88,7 +115,13 @@ export default function MediaDetails() {
     const [watchlistId, setWatchlistId] = useState("");
     const [watchStatus, setWatchStatus] = useState<"planned" | "watching" | "completed">("planned");
     const [isAdding, setIsAdding] = useState(false);
-    const [activeTab, setActiveTab] = useState<"overview" | "cast" | "similar">("overview");
+    const [activeTab, setActiveTab] = useState<"overview" | "cast" | "similar" | "episodes">("overview");
+    
+    // New state for episodes
+    const [seasons, setSeasons] = useState<Season[]>([]);
+    const [loadingEpisodes, setLoadingEpisodes] = useState(false);
+    const [selectedSeason, setSelectedSeason] = useState<number>(1);
+    const [episodes, setEpisodes] = useState<Episode[]>([]);
 
     const getValidType = (): "movie" | "tv" => {
         if (type === "movie" || type === "tv") {
@@ -109,6 +142,12 @@ export default function MediaDetails() {
         }
     }, [type, id, user]);
 
+    useEffect(() => {
+        if (mediaType === "tv" && media?.id && selectedSeason) {
+            fetchTVShowEpisodes();
+        }
+    }, [mediaType, media?.id, selectedSeason]);
+
     const fetchMediaDetails = async () => {
         try {
             setLoading(true);
@@ -124,6 +163,11 @@ export default function MediaDetails() {
                     title: response.data.title || response.data.name || "Unknown Title"
                 };
                 setMedia(mediaData);
+                
+                // Initialize seasons array
+                if (mediaType === "tv" && response.data.seasons) {
+                    setSeasons(response.data.seasons || []);
+                }
             } else {
                 throw new Error("No data received");
             }
@@ -132,6 +176,31 @@ export default function MediaDetails() {
             setError(err.response?.data?.message || err.message || "Failed to fetch media details");
         } finally {
             setLoading(false);
+        }
+    };
+
+    const fetchTVShowEpisodes = async () => {
+        if (!media?.id) return;
+        
+        setLoadingEpisodes(true);
+        try {
+            // Fetch season details from TMDB API
+            const response = await api.get(
+                `https://api.themoviedb.org/3/tv/${media.id}/season/${selectedSeason}`,
+                {
+                    params: {
+                        api_key: import.meta.env.VITE_TMDB_API_KEY,
+                        language: 'en-US'
+                    }
+                }
+            );
+            
+            setEpisodes(response.data.episodes || []);
+        } catch (err: any) {
+            console.error("Error fetching TV show episodes:", err);
+            setEpisodes([]);
+        } finally {
+            setLoadingEpisodes(false);
         }
     };
 
@@ -246,6 +315,10 @@ export default function MediaDetails() {
         }
     };
 
+    const handleGoToWatchlist = () => {
+        navigate("/watchlist");
+    };
+
     const formatCurrency = (amount: number): string => {
         if (amount >= 1_000_000_000) {
             return `$${(amount / 1_000_000_000).toFixed(1)}B`;
@@ -283,6 +356,15 @@ export default function MediaDetails() {
             return media.title || media.name || "Unknown Title";
         }
         return "Unknown Title";
+    };
+
+    const formatEpisodeDate = (dateString: string) => {
+        if (!dateString) return "Unknown date";
+        return new Date(dateString).toLocaleDateString('en-US', {
+            month: 'short',
+            day: 'numeric',
+            year: 'numeric'
+        });
     };
 
     if (loading) {
@@ -457,17 +539,24 @@ export default function MediaDetails() {
                                             >
                                                 {isAdding ? "Removing..." : "Remove from Watchlist"}
                                             </button>
-                                            <span className="text-sm text-slate-400">
-                                                In your watchlist
-                                            </span>
+                                            
+                                            {/* Show "Go to Watchlist" button for TV shows */}
+                                            {mediaType === "tv" && (
+                                                <button
+                                                    onClick={handleGoToWatchlist}
+                                                    className="bg-blue-600 hover:bg-blue-700 text-slate-50 font-medium py-2 px-4 rounded-lg transition duration-200"
+                                                >
+                                                    📺 Go to Watchlist
+                                                </button>
+                                            )}
                                         </div>
 
-                                        {/* Status Selector - Different for movies and TV shows */}
-                                        <div>
-                                            <p className="text-sm text-slate-400 mb-2">Update Status:</p>
-                                            <div className="flex space-x-2">
-                                                {mediaType === "movie" ? (
-                                                    (["planned", "completed"] as const).map((status) => (
+                                        {/* Status Selector - Only show for movies */}
+                                        {mediaType === "movie" && (
+                                            <div>
+                                                <p className="text-sm text-slate-400 mb-2">Update Status:</p>
+                                                <div className="flex space-x-2">
+                                                    {(["planned", "completed"] as const).map((status) => (
                                                         <button
                                                             key={status}
                                                             onClick={() => handleStatusChange(status)}
@@ -482,31 +571,10 @@ export default function MediaDetails() {
                                                             {status === "planned" && "📋 Planned"}
                                                             {status === "completed" && "✅ Completed"}
                                                         </button>
-                                                    ))
-                                                ) : (
-                                                    // TV Shows: All three statuses
-                                                    (["planned", "watching", "completed"] as const).map((status) => (
-                                                        <button
-                                                            key={status}
-                                                            onClick={() => handleStatusChange(status)}
-                                                            disabled={isAdding || watchStatus === status}
-                                                            className={`px-4 py-2 rounded-lg font-medium transition ${watchStatus === status
-                                                                    ? status === "planned"
-                                                                        ? "bg-slate-600 text-slate-300"
-                                                                        : status === "watching"
-                                                                            ? "bg-blue-600 text-blue-100"
-                                                                            : "bg-green-600 text-green-100"
-                                                                    : "bg-slate-700 text-slate-400 hover:bg-slate-600 hover:text-slate-300"
-                                                                }`}
-                                                        >
-                                                            {status === "planned" && "📋 Planned"}
-                                                            {status === "watching" && "👀 Watching"}
-                                                            {status === "completed" && "✅ Completed"}
-                                                        </button>
-                                                    ))
-                                                )}
+                                                    ))}
+                                                </div>
                                             </div>
-                                        </div>
+                                        )}
                                     </div>
                                 )}
 
@@ -588,10 +656,10 @@ export default function MediaDetails() {
 
                 {/* Tabs */}
                 <div className="mb-8">
-                    <div className="flex space-x-1 border-b border-slate-700">
+                    <div className="flex space-x-1 border-b border-slate-700 overflow-x-auto">
                         <button
                             onClick={() => setActiveTab("overview")}
-                            className={`px-6 py-3 font-medium transition ${activeTab === "overview"
+                            className={`px-6 py-3 font-medium transition whitespace-nowrap ${activeTab === "overview"
                                 ? "text-rose-400 border-b-2 border-rose-400"
                                 : "text-slate-400 hover:text-slate-300"
                             }`}
@@ -601,7 +669,7 @@ export default function MediaDetails() {
                         {media.credits?.cast && media.credits.cast.length > 0 && (
                             <button
                                 onClick={() => setActiveTab("cast")}
-                                className={`px-6 py-3 font-medium transition ${activeTab === "cast"
+                                className={`px-6 py-3 font-medium transition whitespace-nowrap ${activeTab === "cast"
                                     ? "text-rose-400 border-b-2 border-rose-400"
                                     : "text-slate-400 hover:text-slate-300"
                                 }`}
@@ -612,12 +680,24 @@ export default function MediaDetails() {
                         {media.similar?.results && media.similar.results.length > 0 && (
                             <button
                                 onClick={() => setActiveTab("similar")}
-                                className={`px-6 py-3 font-medium transition ${activeTab === "similar"
+                                className={`px-6 py-3 font-medium transition whitespace-nowrap ${activeTab === "similar"
                                     ? "text-rose-400 border-b-2 border-rose-400"
                                     : "text-slate-400 hover:text-slate-300"
                                 }`}
                             >
                                 Similar
+                            </button>
+                        )}
+                        {/* Add Episodes tab for TV shows */}
+                        {mediaType === "tv" && (
+                            <button
+                                onClick={() => setActiveTab("episodes")}
+                                className={`px-6 py-3 font-medium transition whitespace-nowrap ${activeTab === "episodes"
+                                    ? "text-rose-400 border-b-2 border-rose-400"
+                                    : "text-slate-400 hover:text-slate-300"
+                                }`}
+                            >
+                                Episodes
                             </button>
                         )}
                     </div>
@@ -721,6 +801,166 @@ export default function MediaDetails() {
                             </div>
                         </div>
                     )}
+
+                    {/* Episodes Tab for TV shows */}
+                    {activeTab === "episodes" && mediaType === "tv" && (
+                        <div className="bg-slate-800 rounded-2xl p-8 border border-slate-700">
+                            <h2 className="text-2xl font-bold mb-6">Episodes</h2>
+                            
+                            {/* Season Selector */}
+                            <div className="mb-6">
+                                <div className="flex items-center justify-between mb-4">
+                                    <h3 className="text-lg font-medium text-slate-50">Seasons</h3>
+                                    <span className="text-sm text-slate-400">
+                                        {seasons.length} seasons available
+                                    </span>
+                                </div>
+                                <div className="flex space-x-2 overflow-x-auto pb-2">
+                                    {seasons.map((season) => (
+                                        <button
+                                            key={season.season_number}
+                                            onClick={() => setSelectedSeason(season.season_number)}
+                                            className={`px-4 py-2 rounded-lg font-medium whitespace-nowrap transition ${
+                                                selectedSeason === season.season_number
+                                                    ? "bg-rose-600 text-slate-50"
+                                                    : "bg-slate-700 text-slate-300 hover:bg-slate-600"
+                                            }`}
+                                        >
+                                            {season.season_number === 0 ? "Specials" : `Season ${season.season_number}`}
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+
+                            {/* Current Season Info */}
+                            <div className="mb-6 p-4 bg-slate-900/50 rounded-lg">
+                                <div className="flex items-center justify-between">
+                                    <div>
+                                        <h4 className="text-lg font-medium text-slate-50">
+                                            {selectedSeason === 0 ? "Specials" : `Season ${selectedSeason}`}
+                                        </h4>
+                                        <p className="text-sm text-slate-400">
+                                            {episodes.length} episodes
+                                        </p>
+                                    </div>
+                                    {seasons.find(s => s.season_number === selectedSeason)?.air_date && (
+                                        <span className="text-sm text-slate-400">
+                                            First aired: {formatEpisodeDate(seasons.find(s => s.season_number === selectedSeason)?.air_date || "")}
+                                        </span>
+                                    )}
+                                </div>
+                            </div>
+
+                            {/* Episodes List */}
+                            {loadingEpisodes ? (
+                                <div className="text-center py-8">
+                                    <div className="w-12 h-12 border-4 border-rose-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+                                    <p className="text-slate-400">Loading episodes...</p>
+                                </div>
+                            ) : episodes.length > 0 ? (
+                                <div className="space-y-4 max-h-[600px] overflow-y-auto pr-4">
+                                    {episodes.map((episode) => (
+                                        <div
+                                            key={episode.id}
+                                            className="bg-slate-900/50 rounded-lg p-4 border border-slate-700 hover:border-slate-600 transition"
+                                        >
+                                            <div className="flex space-x-4">
+                                                {/* Episode Image */}
+                                                <div className="flex-shrink-0">
+                                                    {episode.still_path ? (
+                                                        <img
+                                                            src={`https://image.tmdb.org/t/p/w300${episode.still_path}`}
+                                                            alt={episode.name}
+                                                            className="w-40 h-24 object-cover rounded-lg"
+                                                        />
+                                                    ) : (
+                                                        <div className="w-40 h-24 bg-slate-700 rounded-lg flex items-center justify-center">
+                                                            <span className="text-2xl">📺</span>
+                                                        </div>
+                                                    )}
+                                                </div>
+
+                                                {/* Episode Details */}
+                                                <div className="flex-1">
+                                                    <div className="flex justify-between items-start mb-2">
+                                                        <div>
+                                                            <h4 className="text-lg font-medium text-slate-50">
+                                                                Episode {episode.episode_number}: {episode.name}
+                                                            </h4>
+                                                            <div className="flex items-center space-x-3 mt-1">
+                                                                <span className="text-sm text-slate-400">
+                                                                    {formatEpisodeDate(episode.air_date)}
+                                                                </span>
+                                                                {episode.runtime > 0 && (
+                                                                    <span className="text-sm text-slate-400">
+                                                                        {episode.runtime} min
+                                                                    </span>
+                                                                )}
+                                                                <span className="text-sm text-rose-400">
+                                                                    ⭐ {episode.vote_average?.toFixed(1) || "N/A"}
+                                                                </span>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                    
+                                                    <p className="text-sm text-slate-300 line-clamp-2">
+                                                        {episode.overview || "No description available."}
+                                                    </p>
+                                                    
+                                                    <div className="mt-3 pt-3 border-t border-slate-700">
+                                                        <p className="text-xs text-slate-500">
+                                                            {episode.guest_stars?.length > 0 && (
+                                                                <>Guest stars: {episode.guest_stars.slice(0, 3).map(star => star.name).join(", ")}</>
+                                                            )}
+                                                            {episode.guest_stars?.length > 3 && "..."}
+                                                        </p>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            ) : (
+                                <div className="text-center py-12">
+                                    <div className="text-4xl mb-4">📺</div>
+                                    <h4 className="text-xl font-medium text-slate-50 mb-2">No Episodes Found</h4>
+                                    <p className="text-slate-400">
+                                        Episode information is not available for this season.
+                                    </p>
+                                </div>
+                            )}
+
+                            {/* Note about tracking episodes */}
+                            <div className="mt-8 p-4 bg-slate-900/30 rounded-lg border border-slate-600">
+                                <div className="flex items-start space-x-3">
+                                    <div className="text-2xl">💡</div>
+                                    <div>
+                                        <h5 className="font-medium text-slate-50 mb-1">Want to track episodes?</h5>
+                                        <p className="text-sm text-slate-400">
+                                            Add this TV show to your watchlist to track which episodes you've watched
+                                            and get personalized statistics.
+                                        </p>
+                                        {!inWatchlist && user && (
+                                            <button
+                                                onClick={handleAddToWatchlist}
+                                                className="mt-2 bg-rose-600 hover:bg-rose-700 text-slate-50 text-sm font-medium py-2 px-4 rounded-lg transition"
+                                            >
+                                                + Add to Watchlist to Track Episodes
+                                            </button>
+                                        )}
+                                        {inWatchlist && (
+                                            <button
+                                                onClick={handleGoToWatchlist}
+                                                className="mt-2 bg-blue-600 hover:bg-blue-700 text-slate-50 text-sm font-medium py-2 px-4 rounded-lg transition"
+                                            >
+                                                📺 Go to Watchlist to Track Episodes
+                                            </button>
+                                        )}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    )}
                 </div>
 
                 {/* Watch Time Info */}
@@ -736,6 +976,11 @@ export default function MediaDetails() {
                                     </span>{" "}
                                     to your total watch time.
                                 </p>
+                                {mediaType === "tv" && (
+                                    <p className="text-sm text-slate-500 mt-2">
+                                        Note: This is an estimated total for all episodes.
+                                    </p>
+                                )}
                             </div>
                             <div className="text-4xl">⏱️</div>
                         </div>

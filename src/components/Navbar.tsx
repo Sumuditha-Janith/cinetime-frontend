@@ -189,9 +189,9 @@ export default function Navbar() {
                                         className="flex items-center space-x-3 bg-slate-700 hover:bg-slate-600 text-slate-50 px-4 py-2 rounded-lg transition duration-200 focus:outline-none focus:ring-2 focus:ring-rose-500"
                                     >
                                         {/* User Avatar */}
-                                        <div className="w-8 h-8 bg-rose-600 rounded-full flex items-center justify-center">
+                                        {/* <div className="w-8 h-8 bg-rose-600 rounded-full flex items-center justify-center">
                                             <span className="text-sm font-bold">{getUserInitial()}</span>
-                                        </div>
+                                        </div> */}
 
                                         {/* User Info - Desktop only */}
                                         <div className="flex flex-col items-start">
