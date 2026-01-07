@@ -1,7 +1,3 @@
-import axios from "axios";
-
-const TMDB_API_KEY = import.meta.env.VITE_TMDB_API_KEY;
-const TMDB_BASE_URL = import.meta.env.VITE_TMDB_BASE_URL;
 const TMDB_IMAGE_BASE_URL = import.meta.env.VITE_TMDB_IMAGE_BASE_URL;
 
 export interface MediaItem {
