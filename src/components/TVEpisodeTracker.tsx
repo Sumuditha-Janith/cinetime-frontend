@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import api from "../services/api";
-import { useAuth } from "../context/authContext";
+// import { useAuth } from "../context/authContext";
 
 interface TVEpisode {
     _id: string;
@@ -35,7 +35,7 @@ interface TVEpisodeTrackerProps {
 }
 
 export default function TVEpisodeTracker({ tvShow, onEpisodeStatusChange }: TVEpisodeTrackerProps) {
-    const { user } = useAuth();
+    // const { user } = useAuth();
     const [episodes, setEpisodes] = useState<TVEpisode[]>([]);
     const [seasons, setSeasons] = useState<number[]>([]);
     const [selectedSeason, setSelectedSeason] = useState<number>(1);
@@ -172,14 +172,14 @@ export default function TVEpisodeTracker({ tvShow, onEpisodeStatusChange }: TVEp
         return new Date(dateString).toLocaleDateString();
     };
 
-    const getStatusColor = (status: string) => {
-        switch (status) {
-            case "watched": return "bg-green-600 text-green-100";
-            case "unwatched": return "bg-slate-600 text-slate-300";
-            case "skipped": return "bg-yellow-600 text-yellow-100";
-            default: return "bg-slate-600 text-slate-300";
-        }
-    };
+    // const getStatusColor = (status: string) => {
+    //     switch (status) {
+    //         case "watched": return "bg-green-600 text-green-100";
+    //         case "unwatched": return "bg-slate-600 text-slate-300";
+    //         case "skipped": return "bg-yellow-600 text-yellow-100";
+    //         default: return "bg-slate-600 text-slate-300";
+    //     }
+    // };
 
     if (loading) {
         return (

@@ -1,11 +1,11 @@
 import { useState, useRef, useEffect } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link } from "react-router-dom";
 import { useAuth } from "../context/authContext";
 import SearchBar from "./SearchBar";
 
 export default function Navbar() {
     const { user, logout } = useAuth();
-    const navigate = useNavigate();
+    // const navigate = useNavigate();
     const [dropdownOpen, setDropdownOpen] = useState(false);
     const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
     const dropdownRef = useRef<HTMLDivElement>(null);
