@@ -45,7 +45,11 @@ export default function Login() {
                 {/* Header */}
                 <div className="text-center mb-8">
                     <div className="inline-block p-3 rounded-2xl bg-rose-600 mb-4">
-                        <span className="text-3xl">🎬</span>
+                        <img
+                            src="https://img.icons8.com/external-those-icons-fill-those-icons/24/external-TV-smart-devices-those-icons-fill-those-icons.png"
+                            alt="CINETIME Logo"
+                            className="w-6 h-6 object-contain invert"
+                        />
                     </div>
                     <h1 className="text-3xl font-bold mb-2 text-slate-50">Welcome Back</h1>
                     <p className="text-slate-400">Sign in to your CINETIME account</p>
@@ -91,9 +95,9 @@ export default function Login() {
                     >
                         {loading ? (
                             <span className="flex items-center justify-center">
-                <div className="w-5 h-5 border-2 border-slate-50 border-t-transparent rounded-full animate-spin mr-2"></div>
-                Signing in...
-              </span>
+                            <div className="w-5 h-5 border-2 border-slate-50 border-t-transparent rounded-full animate-spin mr-2"></div>
+                            Signing in...
+                        </span>
                         ) : "Sign In"}
                     </button>
                 </form>

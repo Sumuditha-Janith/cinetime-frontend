@@ -54,14 +54,6 @@ export default function Navbar() {
         return "U";
     };
 
-    const formatRole = (role: string): string => {
-        switch(role) {
-            case "ADMIN": return "👑 Admin";
-            case "AUTHOR": return "✍️ Author";
-            default: return "🎬 User";
-        }
-    };
-
     return (
         <nav className="bg-slate-800 border-b border-slate-700 sticky top-0 z-50">
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -74,15 +66,19 @@ export default function Navbar() {
                             className="flex items-center space-x-3"
                             onClick={closeMobileMenu}
                         >
-                            <div className="p-2 bg-rose-600 rounded-lg">
-                                <span className="text-xl">🎬</span>
-                            </div>
-                            <span className="text-xl font-bold text-slate-50 hidden sm:block">
-                                CINETIME
-                            </span>
-                            <span className="text-xl font-bold text-slate-50 sm:hidden">
-                                CT
-                            </span>
+<div className="p-2 bg-rose-600 rounded-lg flex items-center justify-center">
+    <img 
+        src="https://img.icons8.com/external-those-icons-fill-those-icons/24/external-TV-smart-devices-those-icons-fill-those-icons.png" 
+        alt="CINETIME Logo" 
+        className="w-6 h-6 object-contain" 
+    />
+</div>
+<span className="text-xl font-bold text-slate-50 hidden sm:block">
+    CINETIME
+</span>
+<span className="text-xl font-bold text-slate-50 sm:hidden">
+    CT
+</span>
                         </Link>
 
                         {/* Desktop Navigation Links - Only show when logged in */}
@@ -179,11 +175,10 @@ export default function Navbar() {
                             </button>
                         </div>
 
-                        {/* Desktop User Menu - Minimalistic */}
+                        {/* Desktop User Menu */}
                         <div className="hidden md:flex items-center space-x-4">
                             {user ? (
                                 <div className="relative" ref={dropdownRef}>
-                                    {/* Minimalistic User Icon Button */}
                                     <button
                                         onClick={() => setDropdownOpen(!dropdownOpen)}
                                         className="flex items-center justify-center w-10 h-10 bg-slate-700 hover:bg-slate-600 text-slate-50 rounded-full transition duration-200 focus:outline-none focus:ring-2 focus:ring-rose-500 focus:ring-offset-2 focus:ring-offset-slate-900"
@@ -236,7 +231,7 @@ export default function Navbar() {
                                                 </div>
                                             </div>
 
-                                            {/* Menu Items - Icon-based */}
+                                            {/* Menu Items */}
                                             <div className="py-2">
                                                 <Link
                                                     to="/home"
@@ -255,6 +250,22 @@ export default function Navbar() {
                                                 </Link>
 
                                                 <Link
+                                                    to="/watchlist"
+                                                    className="flex items-center px-4 py-3 text-sm text-slate-300 hover:bg-slate-700 hover:text-slate-50 transition group"
+                                                    onClick={() => setDropdownOpen(false)}
+                                                >
+                                                    <div className="w-8 h-8 flex items-center justify-center mr-3 bg-slate-900/50 group-hover:bg-slate-600/50 rounded-lg">
+                                                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                                                        </svg>
+                                                    </div>
+                                                    <div>
+                                                        <div className="font-medium">My Watchlist</div>
+                                                        <div className="text-xs text-slate-500">Saved content</div>
+                                                    </div>
+                                                </Link>
+
+                                                <Link
                                                     to="/profile"
                                                     className="flex items-center px-4 py-3 text-sm text-slate-300 hover:bg-slate-700 hover:text-slate-50 transition group"
                                                     onClick={() => setDropdownOpen(false)}
@@ -268,22 +279,6 @@ export default function Navbar() {
                                                     <div>
                                                         <div className="font-medium">Profile Settings</div>
                                                         <div className="text-xs text-slate-500">Manage account</div>
-                                                    </div>
-                                                </Link>
-
-                                                <Link
-                                                    to="/watchlist"
-                                                    className="flex items-center px-4 py-3 text-sm text-slate-300 hover:bg-slate-700 hover:text-slate-50 transition group"
-                                                    onClick={() => setDropdownOpen(false)}
-                                                >
-                                                    <div className="w-8 h-8 flex items-center justify-center mr-3 bg-slate-900/50 group-hover:bg-slate-600/50 rounded-lg">
-                                                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
-                                                        </svg>
-                                                    </div>
-                                                    <div>
-                                                        <div className="font-medium">My Watchlist</div>
-                                                        <div className="text-xs text-slate-500">Saved content</div>
                                                     </div>
                                                 </Link>
 

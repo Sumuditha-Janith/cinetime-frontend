@@ -5,11 +5,20 @@ export default function Welcome() {
     <div className="min-h-screen bg-slate-900 text-slate-50 flex flex-col justify-center items-center p-8 animate-fade-in">
       <div className="max-w-4xl text-center">
         <div className="mb-10">
+          <div className="flex items-center justify-center mb-6">
+            <div className="p-3 bg-rose-600 rounded-xl flex items-center justify-center shadow-lg">
+              <img 
+                src="https://img.icons8.com/external-those-icons-fill-those-icons/24/external-TV-smart-devices-those-icons-fill-those-icons.png" 
+                alt="CINETIME Logo" 
+                className="w-8 h-8 object-contain invert" 
+              />
+            </div>
+          </div>
+          
           <h1 className="text-6xl font-bold mb-4">
             <span className="bg-gradient-to-r from-rose-600 to-rose-500 bg-clip-text text-transparent">
               CINETIME
             </span>
-            <span className="ml-3">🎬</span>
           </h1>
           <p className="text-2xl text-slate-400 mb-2">
             Your Personal Movie & TV Show Tracker
@@ -18,7 +27,6 @@ export default function Welcome() {
             Track, Discover, and Engage with Cinema Like Never Before
           </p>
         </div>
-
 
         {/* Action Buttons */}
         <div className="flex flex-col sm:flex-row gap-6 justify-center">
@@ -35,10 +43,6 @@ export default function Welcome() {
             Sign Up
           </Link>
         </div>
-
-        {/* <p className="mt-12 text-slate-500 text-sm">
-          
-        </p> */}
       </div>
     </div>
   );
