@@ -196,3 +196,15 @@ export const markEpisodesAsWatched = async (episodeIds: string[]) => {
     );
     return Promise.all(promises);
 };
+
+export const generateMediaReport = async (period: string = 'all'): Promise<Blob> => {
+    try {
+        const response = await api.get(`/media/report?period=${period}`, {
+            responseType: 'blob'
+        });
+        return response.data;
+    } catch (error: any) {
+        console.error('Failed to generate report:', error);
+        throw error;
+    }
+};
