@@ -429,7 +429,7 @@ export default function MediaDetails() {
                 <div className="absolute inset-0 bg-gradient-to-t from-slate-900 via-slate-900/80 to-transparent"></div>
                 <div className="absolute bottom-0 left-0 right-0 p-8">
                     <div className="max-w-7xl mx-auto">
-                        <button
+                        {/* <button
                             onClick={() => navigate(-1)}
                             className="mb-4 text-slate-300 hover:text-slate-50 flex items-center"
                         >
@@ -437,7 +437,7 @@ export default function MediaDetails() {
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
                             </svg>
                             Back
-                        </button>
+                        </button> */}
                     </div>
                 </div>
             </div>

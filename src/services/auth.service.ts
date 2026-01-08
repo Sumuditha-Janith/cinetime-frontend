@@ -5,7 +5,6 @@ type RegisterDataType = {
     lastname: string;
     email: string;
     password: string;
-    // Make role optional since we're hardcoding it to "USER"
     role?: string;
 };
 
@@ -85,4 +84,19 @@ export const getUserRole = (): string[] => {
 export const hasRole = (role: string): boolean => {
     const roles = getUserRole();
     return roles.includes(role);
+};
+
+export const updateProfile = async (data: { firstname: string, lastname: string }) => {
+    const res = await api.put("/auth/me", data);
+    return res.data;
+};
+
+export const changePassword = async (data: { currentPassword: string, newPassword: string }) => {
+    const res = await api.put("/auth/me/change-password", data);
+    return res.data;
+};
+
+export const deleteAccount = async (password: string) => {
+    const res = await api.delete("/auth/me", { data: { password } });
+    return res.data;
 };

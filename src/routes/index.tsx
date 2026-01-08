@@ -1,6 +1,7 @@
 import { lazy, Suspense } from "react";
 import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 import ProtectedRoute from "../components/ProtectedRoute";
+import ProfileSettings from "../pages/ProfileSettings";
 
 const Welcome = lazy(() => import("../pages/Welcome"));
 const Register = lazy(() => import("../pages/Register"));
@@ -87,6 +88,15 @@ export default function Router() {
                         }
                     />
 
+                    <Route
+                        path="/profile"
+                        element={
+                            <ProtectedRoute>
+                                <ProfileSettings />
+                            </ProtectedRoute>
+                        }
+                    />
+                    
                     {/* Catch all route */}
                     <Route path="*" element={<Navigate to="/" replace />} />
                 </Routes>
