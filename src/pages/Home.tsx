@@ -4,6 +4,8 @@ import MovieCard from "../components/MovieCard";
 // import SearchBar from "../components/SearchBar";
 import Navbar from "../components/Navbar";
 import { useInfiniteScroll } from "../hooks/useInfiniteScroll";
+import AIChat from "../components/AIChatBot";
+
 
 interface MediaItem {
     id: number;
@@ -412,6 +414,7 @@ export default function Home() {
                     )}
                 </div>
             </div>
+            <AIChat />
         </div>
     );
 }
