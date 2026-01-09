@@ -1,11 +1,9 @@
 import { useState, useEffect, useCallback } from "react";
 import { getTrending, getPopularMovies, searchMedia } from "../services/media.service";
 import MovieCard from "../components/MovieCard";
-// import SearchBar from "../components/SearchBar";
 import Navbar from "../components/Navbar";
 import { useInfiniteScroll } from "../hooks/useInfiniteScroll";
 import AIChat from "../components/AIChatBot";
-
 
 interface MediaItem {
     id: number;
@@ -115,49 +113,6 @@ export default function Home() {
             setLoading(prev => ({ ...prev, popular: false }));
         }
     };
-
-    // const handleSearch = async (query: string) => {
-    //     setSearchQuery(query);
-
-    //     if (!query.trim()) {
-    //         setSearchResults([]);
-    //         setActiveTab("trending");
-    //         setSearchPage(1);
-    //         setHasMoreSearch(true);
-    //         return;
-    //     }
-
-    //     setLoading(prev => ({ ...prev, search: true }));
-    //     setActiveTab("search");
-
-    //     try {
-    //         const response = await searchMedia(query, 1);
-    //         console.log("Search response:", response);
-
-    //         const formattedData = response.data.map((item: any) => ({
-    //             id: item.id,
-    //             title: item.title || "Unknown",
-    //             overview: item.overview || "",
-    //             poster_path: item.poster_path || "",
-    //             backdrop_path: item.backdrop_path,
-    //             release_date: item.release_date || "",
-    //             vote_average: item.vote_average || 0,
-    //             vote_count: item.vote_count || 0,
-    //             type: item.type || (item.title ? "movie" : "tv"),
-    //             media_type: item.media_type || item.type || (item.title ? "movie" : "tv"),
-    //             genre_ids: item.genre_ids || []
-    //         }));
-
-    //         setSearchResults(formattedData);
-    //         setHasMoreSearch(1 < (response.pagination?.total_pages || 1)); // FIXED: Changed 'page' to 1
-    //         setSearchPage(1);
-    //     } catch (error) {
-    //         console.error("Search error:", error);
-    //         setSearchResults([]);
-    //     } finally {
-    //         setLoading(prev => ({ ...prev, search: false }));
-    //     }
-    // };
 
     // Infinite scroll handlers
     const loadMoreTrending = useCallback(async () => {
@@ -318,11 +273,11 @@ export default function Home() {
                 </div>
 
                 {/* Debug Info */}
-                <div className="mb-4 p-4 bg-slate-800/50 rounded-lg">
+                {/* <div className="mb-4 p-4 bg-slate-800/50 rounded-lg">
                     <p className="text-sm text-slate-400">
                         Active Tab: {activeTab} | Trending: {trending.length} | Popular: {popular.length} | Search: {searchResults.length}
                     </p>
-                </div>
+                </div> */}
 
                 {/* Content Section */}
                 <div>

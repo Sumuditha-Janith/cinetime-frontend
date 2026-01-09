@@ -3,7 +3,6 @@ import { Link } from "react-router-dom";
 import { addToWatchlist, addTVShowToWatchlist, removeFromWatchlist, updateWatchStatus } from "../services/media.service";
 import TMDBService from "../services/tmdb.service";
 import { useAuth } from "../context/authContext";
-import { debug } from "../utils/debug";
 
 interface MovieCardProps {
     media: {
@@ -41,12 +40,6 @@ export default function MovieCard({
 
     // Sync local state with props
     useEffect(() => {
-        debug.log('MovieCard', 'Props updated', {
-            isInWatchlist,
-            watchStatus,
-            watchlistId,
-            title: media.title
-        });
         setInWatchlist(isInWatchlist);
         if (watchStatus) {
             setCurrentStatus(watchStatus);
@@ -82,11 +75,6 @@ const handleAddToWatchlist = async () => {
 
     setLoading(true);
     try {
-        debug.log('MovieCard', 'Adding to watchlist', {
-            title: media.title,
-            type: mediaType
-        });
-
         if (mediaType === "movie") {
             // Add movie to watchlist
             await addToWatchlist({
@@ -111,12 +99,10 @@ const handleAddToWatchlist = async () => {
         setInWatchlist(true);
         setCurrentStatus("planned");
         if (onStatusChange) {
-            debug.log('MovieCard', 'Calling onStatusChange for add', { status: "planned" });
             onStatusChange("planned");
         }
         alert(`Added to ${mediaType === "movie" ? "movies" : "TV shows"} watchlist successfully!`);
     } catch (error: any) {
-        debug.error('MovieCard', 'Failed to add to watchlist', error);
         if (error.response?.status === 400 && error.response?.data?.message?.includes("already in your watchlist")) {
             alert("This item is already in your watchlist!");
             setInWatchlist(true);
@@ -133,16 +119,13 @@ const handleAddToWatchlist = async () => {
 
         setLoading(true);
         try {
-            debug.log('MovieCard', 'Removing from watchlist', { watchlistId, title: media.title });
             await removeFromWatchlist(watchlistId);
             setInWatchlist(false);
             if (onStatusChange) {
-                debug.log('MovieCard', 'Calling onStatusChange for remove', { status: "planned" });
                 onStatusChange("planned");
             }
             alert("Removed from watchlist!");
         } catch (error: any) {
-            debug.error('MovieCard', 'Failed to remove from watchlist', error);
             alert(error.response?.data?.message || "Failed to remove from watchlist");
         } finally {
             setLoading(false);
@@ -152,27 +135,16 @@ const handleAddToWatchlist = async () => {
     const handleStatusChange = async (newStatus: "planned" | "watching" | "completed") => {
         if (!watchlistId) return;
 
-        debug.log('MovieCard', 'handleStatusChange called', {
-            watchlistId,
-            title: media.title,
-            currentStatus,
-            newStatus
-        });
-
         setLoading(true);
         try {
-            const response = await updateWatchStatus(watchlistId, { watchStatus: newStatus });
-            debug.log('MovieCard', 'Status update API response', response);
+            await updateWatchStatus(watchlistId, { watchStatus: newStatus });
 
             setCurrentStatus(newStatus);
 
-            // Call the onStatusChange callback with the new status
             if (onStatusChange) {
-                debug.log('MovieCard', 'Calling onStatusChange', { newStatus });
                 onStatusChange(newStatus);
             }
         } catch (error: any) {
-            debug.error('MovieCard', 'Failed to update status', error);
             alert(error.response?.data?.message || "Failed to update status");
         } finally {
             setLoading(false);
@@ -296,16 +268,6 @@ const handleAddToWatchlist = async () => {
                             <Link
                                 to={`/media/${getMediaType()}/${media.id}`}
                                 className="block w-full bg-slate-800/90 hover:bg-slate-700/90 text-slate-300 hover:text-slate-50 font-medium py-2 px-4 rounded-lg transition duration-200 text-center"
-                                onClick={() => {
-                                    console.log(`Navigating to: /media/${getMediaType()}/${media.id}`);
-                                    console.log('Media object:', {
-                                        id: media.id,
-                                        title: media.title,
-                                        type: media.type,
-                                        media_type: media.media_type,
-                                        getMediaType: getMediaType()
-                                    });
-                                }}
                             >
                                 View Details
                             </Link>

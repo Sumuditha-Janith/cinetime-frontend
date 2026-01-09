@@ -155,7 +155,7 @@ export default function SearchResults() {
                                     Previous
                                 </button>
                                 <span className="text-slate-400">
-                  Page {page} of {totalPages}
+                  Page {page}
                 </span>
                                 <button
                                     onClick={() => setPage(prev => Math.min(totalPages, prev + 1))}

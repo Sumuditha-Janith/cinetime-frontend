@@ -116,7 +116,7 @@ export default function MediaDetails() {
     const [watchStatus, setWatchStatus] = useState<"planned" | "watching" | "completed">("planned");
     const [isAdding, setIsAdding] = useState(false);
     const [activeTab, setActiveTab] = useState<"overview" | "cast" | "similar" | "episodes">("overview");
-    
+
     // New state for episodes
     const [seasons, setSeasons] = useState<Season[]>([]);
     const [loadingEpisodes, setLoadingEpisodes] = useState(false);
@@ -151,10 +151,8 @@ export default function MediaDetails() {
     const fetchMediaDetails = async () => {
         try {
             setLoading(true);
-            console.log(`Fetching ${mediaType} details for ID: ${id}`);
 
             const response = await getMediaDetails(parseInt(id!), mediaType);
-            console.log("Media details response:", response);
 
             if (response.data) {
                 const mediaData = {
@@ -163,7 +161,7 @@ export default function MediaDetails() {
                     title: response.data.title || response.data.name || "Unknown Title"
                 };
                 setMedia(mediaData);
-                
+
                 // Initialize seasons array
                 if (mediaType === "tv" && response.data.seasons) {
                     setSeasons(response.data.seasons || []);
@@ -172,7 +170,6 @@ export default function MediaDetails() {
                 throw new Error("No data received");
             }
         } catch (err: any) {
-            console.error("Error fetching media details:", err);
             setError(err.response?.data?.message || err.message || "Failed to fetch media details");
         } finally {
             setLoading(false);
@@ -181,7 +178,7 @@ export default function MediaDetails() {
 
     const fetchTVShowEpisodes = async () => {
         if (!media?.id) return;
-        
+
         setLoadingEpisodes(true);
         try {
             // Fetch season details from TMDB API
@@ -194,7 +191,7 @@ export default function MediaDetails() {
                     }
                 }
             );
-            
+
             setEpisodes(response.data.episodes || []);
         } catch (err: any) {
             console.error("Error fetching TV show episodes:", err);
@@ -272,13 +269,13 @@ export default function MediaDetails() {
                 setWatchlistId(response.data.data._id);
                 setWatchStatus("planned");
             }
-            
+
             alert(`Added to ${mediaType === "movie" ? "movies" : "TV shows"} watchlist successfully!`);
         } catch (err: any) {
             console.error("Error adding to watchlist:", err);
             const errorMessage = err.response?.data?.message || "Failed to add to watchlist";
             alert(errorMessage);
-            
+
             // If it's already in watchlist, update the local state
             if (errorMessage.includes("already in your watchlist")) {
                 setInWatchlist(true);
@@ -539,7 +536,7 @@ export default function MediaDetails() {
                                             >
                                                 {isAdding ? "Removing..." : "Remove from Watchlist"}
                                             </button>
-                                            
+
                                             {/* Show "Go to Watchlist" button for TV shows */}
                                             {mediaType === "tv" && (
                                                 <button
@@ -562,11 +559,11 @@ export default function MediaDetails() {
                                                             onClick={() => handleStatusChange(status)}
                                                             disabled={isAdding || watchStatus === status}
                                                             className={`px-4 py-2 rounded-lg font-medium transition ${watchStatus === status
-                                                                    ? status === "planned"
-                                                                        ? "bg-slate-600 text-slate-300"
-                                                                        : "bg-green-600 text-green-100"
-                                                                    : "bg-slate-700 text-slate-400 hover:bg-slate-600 hover:text-slate-300"
-                                                                }`}
+                                                                ? status === "planned"
+                                                                    ? "bg-slate-600 text-slate-300"
+                                                                    : "bg-green-600 text-green-100"
+                                                                : "bg-slate-700 text-slate-400 hover:bg-slate-600 hover:text-slate-300"
+                                                            }`}
                                                         >
                                                             {status === "planned" && "📋 Planned"}
                                                             {status === "completed" && "✅ Completed"}
@@ -767,7 +764,7 @@ export default function MediaDetails() {
                                 {media.similar.results.slice(0, 10).map((item) => {
                                     const similarTitle = item.title || item.name || "Unknown";
                                     const similarType = item.title ? "movie" : "tv";
-                                    
+
                                     return (
                                         <Link
                                             key={item.id}
@@ -806,7 +803,7 @@ export default function MediaDetails() {
                     {activeTab === "episodes" && mediaType === "tv" && (
                         <div className="bg-slate-800 rounded-2xl p-8 border border-slate-700">
                             <h2 className="text-2xl font-bold mb-6">Episodes</h2>
-                            
+
                             {/* Season Selector */}
                             <div className="mb-6">
                                 <div className="flex items-center justify-between mb-4">
@@ -902,11 +899,11 @@ export default function MediaDetails() {
                                                             </div>
                                                         </div>
                                                     </div>
-                                                    
+
                                                     <p className="text-sm text-slate-300 line-clamp-2">
                                                         {episode.overview || "No description available."}
                                                     </p>
-                                                    
+
                                                     <div className="mt-3 pt-3 border-t border-slate-700">
                                                         <p className="text-xs text-slate-500">
                                                             {episode.guest_stars?.length > 0 && (

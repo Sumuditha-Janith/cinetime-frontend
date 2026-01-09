@@ -1,6 +1,5 @@
 import { useState, useEffect } from "react";
 import api from "../services/api";
-// import { useAuth } from "../context/authContext";
 
 interface TVEpisode {
     _id: string;
@@ -95,19 +94,11 @@ export default function TVEpisodeTracker({ tvShow, onEpisodeStatusChange }: TVEp
 
     const handleEpisodeStatusUpdate = async (episodeId: string, newStatus: "unwatched" | "watched" | "skipped") => {
         try {
-            console.log(`🔄 Updating episode ${episodeId} to ${newStatus}`);
-
-            // Get episode details before update
-            const episodeBefore = episodes.find(ep => ep._id === episodeId);
-            console.log(`📊 Episode runtime: ${episodeBefore?.runtime || 45} minutes`);
-
             const response = await api.put(`/media/episodes/${episodeId}/status`, {
                 watchStatus: newStatus
             });
 
             if (response.status === 200) {
-                console.log(`✅ Episode status updated to ${newStatus}`);
-
                 // Update local state
                 setEpisodes(prevEpisodes =>
                     prevEpisodes.map(ep =>
@@ -133,7 +124,6 @@ export default function TVEpisodeTracker({ tvShow, onEpisodeStatusChange }: TVEp
 
                 // Call the callback to refresh stats
                 if (onEpisodeStatusChange) {
-                    console.log(`🔄 Triggering stats refresh for episode watch time update`);
                     const result = onEpisodeStatusChange();
                     if (result && typeof result.then === 'function') {
                         await result;

@@ -1,4 +1,3 @@
-// cinetime-frontend/components/Watchlist.tsx
 import { useState, useEffect } from "react";
 import {
     getWatchlist,
@@ -11,7 +10,6 @@ import MovieCard from "../components/MovieCard";
 import TVEpisodeTracker from "../components/TVEpisodeTracker";
 import Navbar from "../components/Navbar";
 import { useAuth } from "../context/authContext";
-import { debug } from "../utils/debug";
 import TMDBService from "../services/tmdb.service";
 import ReportGenerator from "../components/ReportGenerator";
 
@@ -97,17 +95,10 @@ export default function Watchlist() {
     const [contentType, setContentType] = useState<"movies" | "tv">("movies");
     
     const [lastUpdated, setLastUpdated] = useState<Date>(new Date());
-    const [debugInfo, setDebugInfo] = useState<string[]>([]);
     const [expandedTVShow, setExpandedTVShow] = useState<string | null>(null);
-
-    const addDebugInfo = (info: string) => {
-        setDebugInfo(prev => [...prev.slice(-9), `${new Date().toLocaleTimeString()}: ${info}`]);
-    };
 
     useEffect(() => {
         if (user) {
-            debug.log('Watchlist', 'Component mounted or user changed', { user: user.email });
-            addDebugInfo(`User logged in: ${user.email}`);
             fetchWatchlist();
             fetchStats();
         }
@@ -122,16 +113,8 @@ export default function Watchlist() {
 
     const fetchWatchlist = async () => {
         try {
-            addDebugInfo('Fetching watchlist...');
-            
             // Fetch all watchlist items without filter
             const response = await getWatchlist(1);
-            
-            debug.log('Watchlist', 'Watchlist API response', {
-                items: response.data.length,
-                data: response.data
-            });
-            addDebugInfo(`Got ${response.data.length} watchlist items`);
 
             // Separate movies and TV shows
             const allMovies = response.data.filter((item: WatchlistItem) => item.type === "movie");
@@ -145,8 +128,6 @@ export default function Watchlist() {
             setTVShows(filteredTVShows);
             setWatchlist(response.data);
         } catch (error: any) {
-            debug.error('Watchlist', 'Failed to fetch watchlist', error);
-            addDebugInfo(`Error fetching watchlist: ${error.message}`);
             setWatchlist([]);
             setMovies([]);
             setTVShows([]);
@@ -169,8 +150,6 @@ export default function Watchlist() {
 
     const fetchStats = async () => {
         try {
-            addDebugInfo('Fetching stats from API...');
-
             const [watchlistStatsRes, episodeStatsRes] = await Promise.all([
                 getWatchlistStats(),
                 getEpisodeStatistics()
@@ -179,48 +158,29 @@ export default function Watchlist() {
             setStats(watchlistStatsRes.data);
             setEpisodeStats(episodeStatsRes.data);
             setLastUpdated(new Date());
-
-            addDebugInfo(`Stats loaded: ${watchlistStatsRes.data?.totalItems || 0} items`);
         } catch (error: any) {
-            debug.error('Watchlist', 'Failed to fetch stats', error);
-            addDebugInfo(`Error fetching stats: ${error.message}`);
+            // Error handling
         }
     };
 
     const forceRefreshStats = async () => {
-        addDebugInfo('Manual refresh triggered');
         setRefreshingStats(true);
         try {
             await Promise.all([fetchStats(), fetchWatchlist()]);
-            addDebugInfo('Refresh completed successfully');
         } catch (error) {
-            debug.error('Watchlist', 'Failed to refresh', error);
-            addDebugInfo('Refresh failed');
+            // Error handling
         } finally {
             setRefreshingStats(false);
         }
     };
 
     const handleStatusUpdate = async (mediaId: string, newStatus: "planned" | "watching" | "completed") => {
-        debug.log('Watchlist', 'handleStatusUpdate called', { mediaId, newStatus });
-        addDebugInfo(`Updating status for ${mediaId} to ${newStatus}`);
-
         const itemToUpdate = watchlist.find(item => item._id === mediaId);
         if (!itemToUpdate) {
-            debug.error('Watchlist', 'Item not found in watchlist', { mediaId });
-            addDebugInfo(`Item ${mediaId} not found in watchlist`);
             return;
         }
 
-        console.log('🔄 Status update details:', {
-            title: itemToUpdate.title,
-            currentStatus: itemToUpdate.watchStatus,
-            newStatus,
-            type: itemToUpdate.type
-        });
-
         if (itemToUpdate.type === "tv" && newStatus === "watching") {
-            addDebugInfo(`Auto-expanding TV show: ${itemToUpdate.title}`);
             setExpandedTVShow(itemToUpdate._id);
         }
 
@@ -236,28 +196,19 @@ export default function Watchlist() {
         }
 
         try {
-            const response = await updateWatchStatus(mediaId, { watchStatus: newStatus });
-            console.log('✅ API Response:', response);
-            addDebugInfo(`API: Status updated to ${newStatus} for "${itemToUpdate.title}"`);
-
+            await updateWatchStatus(mediaId, { watchStatus: newStatus });
             await forceRefreshStats();
         } catch (error: any) {
-            debug.error('Watchlist', 'Status update failed', error);
-            console.error('❌ API Error:', error.response?.data || error.message);
-            addDebugInfo(`Update failed: ${error.response?.data?.message || error.message}`);
             await fetchWatchlist();
         }
     };
 
     const handleRemove = async (mediaId: string) => {
-        debug.log('Watchlist', 'handleRemove called', { mediaId });
-        addDebugInfo(`Removing item ${mediaId}`);
         try {
             await removeFromWatchlist(mediaId);
             await forceRefreshStats();
         } catch (error) {
-            debug.error('Watchlist', 'Failed to remove', error);
-            addDebugInfo('Remove failed');
+            // Error handling
         }
     };
 
@@ -363,7 +314,7 @@ export default function Watchlist() {
                             Generate Report
                         </button>
 
-                        {/* Refresh Button */}
+                        {/* Refresh Button - KEPT as requested */}
                         <button
                             onClick={forceRefreshStats}
                             disabled={refreshingStats}
@@ -579,12 +530,6 @@ export default function Watchlist() {
                                             watchlistId={item._id}
                                             watchStatus={item.watchStatus}
                                             onStatusChange={(newStatus) => {
-                                                debug.log('Watchlist', 'MovieCard onStatusChange triggered', {
-                                                    itemId: item._id,
-                                                    title: item.title,
-                                                    newStatus
-                                                });
-                                                addDebugInfo(`Status change for "${item.title}": ${item.watchStatus} → ${newStatus}`);
                                                 handleStatusUpdate(item._id, newStatus);
                                             }}
                                             showActions={true}
@@ -757,27 +702,6 @@ export default function Watchlist() {
                     </>
                 )}
 
-                {/* Debug Panel */}
-                <div className="mt-8 p-6 bg-slate-800/50 rounded-2xl border border-slate-700">
-                    <div className="flex justify-between items-center mb-2">
-                        <h3 className="text-sm font-bold text-rose-400">Debug Console</h3>
-                        <button
-                            onClick={() => setDebugInfo([])}
-                            className="text-xs text-slate-400 hover:text-slate-300"
-                        >
-                            Clear
-                        </button>
-                    </div>
-                    <div className="h-32 overflow-y-auto bg-slate-900 rounded p-2 font-mono text-xs">
-                        {debugInfo.length === 0 ? (
-                            <p className="text-slate-500">No debug messages yet...</p>
-                        ) : (
-                            debugInfo.map((msg, idx) => (
-                                <div key={idx} className="text-slate-300 mb-1">{msg}</div>
-                            ))
-                        )}
-                    </div>
-                </div>
                 {showReportGenerator && (
                     <ReportGenerator onClose={() => setShowReportGenerator(false)} />
                 )}
